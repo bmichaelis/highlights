@@ -30,5 +30,13 @@ export async function GET(_req: Request, { params }: Params) {
   url.searchParams.set('prompt', 'consent')
   url.searchParams.set('state', state)
 
-  return NextResponse.redirect(url.toString())
+  const response = NextResponse.redirect(url.toString())
+  response.cookies.set('drive_oauth_state', state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 600, // 10 minutes
+    path: '/',
+  })
+  return response
 }
