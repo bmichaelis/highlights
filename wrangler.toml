@@ -1,0 +1,41 @@
+name = "highlights"
+main = ".open-next/worker.js"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[vars]
+AUTH_GOOGLE_ID = ""
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "highlights"
+
+[[durable_objects.bindings]]
+name = "DOQueueHandler"
+class_name = "DOQueueHandler"
+
+[[durable_objects.bindings]]
+name = "DOShardedTagCache"
+class_name = "DOShardedTagCache"
+
+[[durable_objects.bindings]]
+name = "BucketCachePurge"
+class_name = "BucketCachePurge"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"]
+
+[[r2_buckets]]
+binding = "AUDIO_BUCKET"
+bucket_name = "highlights-audio"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "highlights-db"
+database_id = ""
+migrations_dir = "db/migrations"
