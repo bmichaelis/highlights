@@ -1,0 +1,20 @@
+import { NextResponse } from 'next/server'
+import { getDb } from '@/db'
+import { organizations, teams } from '@/db/schema'
+import { requireSession, requireOrgMember } from '@/lib/auth-helpers'
+import { eq } from 'drizzle-orm'
+
+type Params = { params: Promise<{ orgSlug: string; teamId: string }> }
+
+export async function GET(_req: Request, { params }: Params) {
+  const session = await requireSession()
+  const { orgSlug, teamId } = await params
+  const db = getDb()
+  const org = await db.query.organizations.findFirst({ where: eq(organizations.slug, orgSlug) })
+  if (!org) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const member = await requireOrgMember(org.id, session.user.id)
+  if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const team = await db.query.teams.findFirst({ where: eq(teams.id, teamId) })
+  if (!team || team.orgId !== org.id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json(team)
+}
