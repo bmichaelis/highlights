@@ -9,6 +9,8 @@ binding = "ASSETS"
 
 [vars]
 AUTH_GOOGLE_ID = ""
+DRIVE_GOOGLE_CLIENT_ID = ""
+NEXTAUTH_URL = "https://highlights.your-subdomain.workers.dev"
 
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
