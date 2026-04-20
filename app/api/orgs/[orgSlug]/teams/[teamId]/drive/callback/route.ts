@@ -3,6 +3,7 @@ import { requireSession } from '@/lib/auth-helpers'
 import { getDb } from '@/db'
 import { driveConnections } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import { cookies } from 'next/headers'
 
 type Params = { params: Promise<{ orgSlug: string; teamId: string }> }
 
@@ -11,7 +12,15 @@ export async function GET(req: Request, { params }: Params) {
   const { orgSlug, teamId } = await params
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
+  const returnedState = searchParams.get('state')
   if (!code) return NextResponse.json({ error: 'No code' }, { status: 400 })
+
+  // Validate CSRF state
+  const cookieStore = await cookies()
+  const expectedState = cookieStore.get('drive_oauth_state')?.value
+  if (!expectedState || expectedState !== returnedState) {
+    return NextResponse.json({ error: 'Invalid state' }, { status: 400 })
+  }
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -26,6 +35,10 @@ export async function GET(req: Request, { params }: Params) {
   })
   if (!tokenRes.ok) return NextResponse.json({ error: 'Token exchange failed' }, { status: 500 })
   const tokens = await tokenRes.json()
+
+  if (!tokens.refresh_token) {
+    return NextResponse.json({ error: 'No refresh token returned. Try disconnecting and reconnecting.' }, { status: 502 })
+  }
 
   const folderId = searchParams.get('folder_id') ?? 'PENDING'
 
@@ -47,5 +60,8 @@ export async function GET(req: Request, { params }: Params) {
     },
   })
 
-  return NextResponse.redirect(new URL(`/orgs/${orgSlug}/teams/${teamId}`, req.url))
+  // Clear the state cookie
+  const response = NextResponse.redirect(new URL(`/orgs/${orgSlug}/teams/${teamId}`, req.url))
+  response.cookies.delete('drive_oauth_state')
+  return response
 }
