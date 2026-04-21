@@ -1,3 +1,7 @@
+import { getDb } from '@/db'
+import { driveConnections } from '@/db/schema'
+import { eq } from 'drizzle-orm'
+
 export async function refreshDriveToken(refreshToken: string): Promise<{ accessToken: string; expiresAt: number }> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -17,12 +21,13 @@ export async function refreshDriveToken(refreshToken: string): Promise<{ accessT
   }
 }
 
-export async function getFreshAccessToken(conn: {
-  accessToken: string
-  refreshToken: string
-  expiresAt: number | null
-}): Promise<string> {
-  if (!conn.expiresAt || conn.expiresAt - Date.now() > 60_000) return conn.accessToken
-  const { accessToken } = await refreshDriveToken(conn.refreshToken)
+export async function getFreshAccessToken(
+  conn: { id: string; accessToken: string; refreshToken: string; expiresAt: Date | number | null },
+  db: ReturnType<typeof getDb>
+): Promise<string> {
+  const expiresAtMs = conn.expiresAt instanceof Date ? conn.expiresAt.getTime() : conn.expiresAt
+  if (!expiresAtMs || expiresAtMs - Date.now() > 60_000) return conn.accessToken
+  const { accessToken, expiresAt } = await refreshDriveToken(conn.refreshToken)
+  await db.update(driveConnections).set({ accessToken, expiresAt: new Date(expiresAt) }).where(eq(driveConnections.id, conn.id))
   return accessToken
 }

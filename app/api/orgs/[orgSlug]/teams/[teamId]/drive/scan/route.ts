@@ -22,11 +22,7 @@ export async function POST(_req: Request, { params }: Params) {
   const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
-  const accessToken = await getFreshAccessToken({
-    accessToken: conn.accessToken,
-    refreshToken: conn.refreshToken,
-    expiresAt: conn.expiresAt instanceof Date ? conn.expiresAt.getTime() : conn.expiresAt,
-  })
+  const accessToken = await getFreshAccessToken(conn, db)
   const { players: foundPlayers, audioFiles } = await scanTeamFolder(conn.folderId, accessToken)
 
   // Batch fetch existing players for this team to avoid N+1
