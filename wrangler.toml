@@ -11,6 +11,8 @@ binding = "ASSETS"
 AUTH_GOOGLE_ID = ""
 DRIVE_GOOGLE_CLIENT_ID = ""
 NEXTAUTH_URL = "https://highlights.your-subdomain.workers.dev"
+GITHUB_OWNER = "placeholder-owner"
+GITHUB_REPO = "highlights"
 
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
