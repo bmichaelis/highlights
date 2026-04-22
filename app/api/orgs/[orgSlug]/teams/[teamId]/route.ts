@@ -52,15 +52,18 @@ export async function DELETE(_req: Request, { params }: Params) {
   const team = await db.query.teams.findFirst({ where: and(eq(teams.id, teamId), eq(teams.orgId, org.id)) })
   if (!team) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  // Manual cascade: playlistItems.playerId has no onDelete clause, so we must clear it before deleting players
   const teamProjects = await db.query.projects.findMany({ where: eq(projects.teamId, teamId) })
-  for (const project of teamProjects) {
-    await db.delete(playlistItems).where(eq(playlistItems.projectId, project.id))
-    await db.delete(players).where(eq(players.projectId, project.id))
-    await db.delete(renderJobs).where(eq(renderJobs.projectId, project.id))
-  }
-  await db.delete(projects).where(eq(projects.teamId, teamId))
-  await db.delete(driveConnections).where(eq(driveConnections.teamId, teamId))
-  await db.delete(teams).where(eq(teams.id, teamId))
+  await db.transaction(async (tx) => {
+    for (const project of teamProjects) {
+      await tx.delete(playlistItems).where(eq(playlistItems.projectId, project.id))
+      await tx.delete(players).where(eq(players.projectId, project.id))
+      await tx.delete(renderJobs).where(eq(renderJobs.projectId, project.id))
+    }
+    await tx.delete(projects).where(eq(projects.teamId, teamId))
+    await tx.delete(driveConnections).where(eq(driveConnections.teamId, teamId))
+    await tx.delete(teams).where(eq(teams.id, teamId))
+  })
 
   return new NextResponse(null, { status: 204 })
 }
