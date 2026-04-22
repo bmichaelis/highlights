@@ -4,6 +4,7 @@ import { organizations, teams, driveConnections, projects } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { TeamManagement } from '@/components/team-management'
 
 type Props = { params: Promise<{ orgSlug: string; teamId: string }> }
 
@@ -22,12 +23,12 @@ export default async function TeamPage({ params }: Props) {
 
   return (
     <main className="max-w-2xl mx-auto p-8 space-y-6">
-      <h1 className="text-2xl font-bold">{team.name}</h1>
+      <TeamManagement orgSlug={orgSlug} teamId={teamId} teamName={team.name} />
 
       <section className="border rounded-lg p-4">
         <h2 className="font-semibold mb-2">Google Drive</h2>
         {drive ? (
-          <p className="text-green-700">Connected: {drive.folderName}</p>
+          <p className="text-green-700 text-sm">Connected</p>
         ) : (
           <a href={`/api/orgs/${orgSlug}/teams/${teamId}/drive/connect`}
             className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
