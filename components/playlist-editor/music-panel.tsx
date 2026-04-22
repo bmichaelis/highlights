@@ -10,18 +10,18 @@ export function MusicPanel({ orgSlug, teamId, projectId }: Props) {
 
   useEffect(() => {
     fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/audio`)
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<AudioFile[]>)
       .then(setAudioFiles)
       .finally(() => setLoading(false))
   }, [orgSlug, teamId, projectId])
 
-  if (loading) return <p className="text-sm text-gray-500">Loading audio…</p>
+  if (loading) return <p className="text-sm text-gray-400">Loading audio…</p>
 
   return (
-    <div className="border rounded-lg p-4 space-y-2">
-      <h3 className="font-semibold text-sm">Music</h3>
+    <div className="border border-gray-700 rounded-lg p-4 space-y-2">
+      <h3 className="font-semibold text-sm text-gray-200">Music</h3>
       {audioFiles.length === 0 ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-400">
           No audio files found in Drive folder. Add .mp3 or .wav files to your team root folder,
           named alphanumerically (e.g. 01_song.mp3, 02_song.mp3).
         </p>
@@ -29,8 +29,8 @@ export function MusicPanel({ orgSlug, teamId, projectId }: Props) {
         <ul className="space-y-1">
           {audioFiles.map((f, i) => (
             <li key={f.id} className="flex items-center gap-2 text-sm">
-              <span className="text-gray-400 w-5 text-right">{i + 1}.</span>
-              <span>{f.name}</span>
+              <span className="text-gray-500 w-5 text-right">{i + 1}.</span>
+              <span className="text-gray-200">{f.name}</span>
             </li>
           ))}
         </ul>

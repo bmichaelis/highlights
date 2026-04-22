@@ -14,7 +14,7 @@ export async function refreshDriveToken(refreshToken: string): Promise<{ accessT
     }),
   })
   if (!res.ok) throw new Error(`Token refresh failed: ${await res.text()}`)
-  const data = await res.json()
+  const data = await res.json() as { access_token: string; expires_in: number }
   return {
     accessToken: data.access_token,
     expiresAt: Date.now() + data.expires_in * 1000,

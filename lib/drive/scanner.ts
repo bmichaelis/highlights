@@ -23,7 +23,7 @@ export async function listFolderContents(folderId: string, accessToken: string):
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (!res.ok) throw new Error(`Drive API error: ${await res.text()}`)
-  const data = await res.json()
+  const data = await res.json() as { files?: DriveFile[] }
   return data.files ?? []
 }
 

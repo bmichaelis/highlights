@@ -30,10 +30,15 @@ export function pickEvenly<T extends { date: number }>(items: T[], n: number): T
   return result
 }
 
-export function mergeChronological<T extends { date: number }>(playerImages: T[][]): T[] {
-  return playerImages
-    .flat()
-    .sort((a, b) => a.date - b.date)
+export function mergeInterspersed<T>(playerImages: T[][]): T[] {
+  const queues = playerImages.filter((imgs) => imgs.length > 0).map((imgs) => [...imgs])
+  const result: T[] = []
+  while (queues.some((q) => q.length > 0)) {
+    for (const queue of queues) {
+      if (queue.length > 0) result.push(queue.shift()!)
+    }
+  }
+  return result
 }
 
 export async function fetchPlayerImages(
@@ -50,7 +55,7 @@ export async function fetchPlayerImages(
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (!folderRes.ok) throw new Error(`Drive folder lookup failed: ${await folderRes.text()}`)
-  const { files: folders } = await folderRes.json()
+  const { files: folders } = await folderRes.json() as { files?: { id: string }[] }
   if (!folders?.length) return []
 
   const subFolderId = folders[0].id
@@ -63,7 +68,7 @@ export async function fetchPlayerImages(
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (!imgRes.ok) throw new Error(`Drive image list failed: ${await imgRes.text()}`)
-  const { files } = await imgRes.json()
+  const { files } = await imgRes.json() as { files?: DriveImageFile[] }
 
   return (files ?? []).map((f: DriveImageFile) => ({
     driveFileId: f.id,
@@ -85,5 +90,5 @@ export async function buildPlaylist(
     players.map((p) => fetchPlayerImages(p.id, p.folderName, parentFolderId, accessToken))
   )
   const selected = allPlayerImages.map((imgs) => pickEvenly(imgs, imagesPerPlayer))
-  return mergeChronological(selected)
+  return mergeInterspersed(selected)
 }

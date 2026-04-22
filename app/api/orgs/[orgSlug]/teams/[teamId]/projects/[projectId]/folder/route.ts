@@ -40,24 +40,30 @@ export async function PATCH(req: Request, { params }: Params) {
     await db.delete(players).where(eq(players.projectId, projectId))
 
     if (folderItems.length > 0) {
-      const newPlayers = await db.insert(players).values(
-        folderItems.map((f) => ({ projectId, name: f.name, folderName: f.name }))
-      ).returning()
+      // D1 limit: 100 bound params per statement. players=4/row → chunk 20; playlistItems=7/row → chunk 10
+      const newPlayers: { id: string; projectId: string; name: string; folderName: string }[] = []
+      for (let i = 0; i < folderItems.length; i += 20) {
+        const chunk = await db.insert(players).values(
+          folderItems.slice(i, i + 20).map((f) => ({ projectId, name: f.name, folderName: f.name }))
+        ).returning()
+        newPlayers.push(...chunk)
+      }
       const playlist = await buildPlaylist(newPlayers, folderId, accessToken, project.imagesPerPlayer)
-      if (playlist.length > 0) {
+      for (let i = 0; i < playlist.length; i += 10) {
         await db.insert(playlistItems).values(
-          playlist.map((item, i) => ({
+          playlist.slice(i, i + 10).map((item, idx) => ({
             projectId,
             playerId: item.playerId,
             driveFileId: item.driveFileId,
             thumbnailUrl: item.thumbnailUrl,
             exifDate: item.date ? new Date(item.date) : null,
-            position: i,
+            position: i + idx,
           }))
         )
       }
     }
-  } catch {
+  } catch (e) {
+    console.error('[folder change] re-sequence failed:', e)
     return NextResponse.json({ error: 'Failed to re-sequence playlist from Drive.' }, { status: 502 })
   }
 

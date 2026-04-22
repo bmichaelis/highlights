@@ -29,7 +29,7 @@ export function PlaylistEditor({ orgSlug, teamId, projectId, defaultDuration, pr
 
   const fetchPlaylist = useCallback(() => {
     fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/playlist`)
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<PlaylistItem[]>)
       .then(setItems)
       .finally(() => setLoading(false))
   }, [orgSlug, teamId, projectId])
@@ -82,15 +82,15 @@ export function PlaylistEditor({ orgSlug, teamId, projectId, defaultDuration, pr
   const totalMins = (totalSecs / 60).toFixed(1)
   const isRenderable = projectStatus === 'draft' || projectStatus === 'failed'
 
-  if (loading) return <p className="text-gray-500">Loading playlist…</p>
+  if (loading) return <p className="text-gray-400">Loading playlist…</p>
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">{items.length} images · ~{totalMins} min</p>
+        <p className="text-sm text-gray-400">{items.length} images · ~{totalMins} min</p>
         <div className="flex gap-2">
           <button onClick={handleResequence}
-            className="text-sm px-3 py-1.5 border rounded-lg hover:bg-gray-50">
+            className="text-sm px-3 py-1.5 border border-gray-600 rounded-lg hover:bg-gray-800 text-gray-200">
             Re-sequence
           </button>
           {isRenderable && (
