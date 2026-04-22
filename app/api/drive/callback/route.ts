@@ -5,20 +5,27 @@ import { driveConnections } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 
-type Params = { params: Promise<{ orgSlug: string; teamId: string }> }
+const REDIRECT_URI = `${process.env.NEXTAUTH_URL}/api/drive/callback`
 
-export async function GET(req: Request, { params }: Params) {
+export async function GET(req: Request) {
   const session = await requireSession()
-  const { orgSlug, teamId } = await params
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const returnedState = searchParams.get('state')
   if (!code) return NextResponse.json({ error: 'No code' }, { status: 400 })
 
-  // Validate CSRF state
   const cookieStore = await cookies()
   const expectedState = cookieStore.get('drive_oauth_state')?.value
   if (!expectedState || expectedState !== returnedState) {
+    return NextResponse.json({ error: 'Invalid state' }, { status: 400 })
+  }
+
+  let orgSlug: string, teamId: string
+  try {
+    const decoded = JSON.parse(Buffer.from(returnedState, 'base64url').toString())
+    orgSlug = decoded.orgSlug
+    teamId = decoded.teamId
+  } catch {
     return NextResponse.json({ error: 'Invalid state' }, { status: 400 })
   }
 
@@ -29,7 +36,7 @@ export async function GET(req: Request, { params }: Params) {
       code,
       client_id: process.env.DRIVE_GOOGLE_CLIENT_ID!,
       client_secret: process.env.DRIVE_GOOGLE_CLIENT_SECRET!,
-      redirect_uri: `${process.env.NEXTAUTH_URL}/api/orgs/${orgSlug}/teams/${teamId}/drive/callback`,
+      redirect_uri: REDIRECT_URI,
       grant_type: 'authorization_code',
     }),
   })
@@ -56,7 +63,6 @@ export async function GET(req: Request, { params }: Params) {
     },
   })
 
-  // Clear the state cookie
   const response = NextResponse.redirect(new URL(`/orgs/${orgSlug}/teams/${teamId}`, req.url))
   response.cookies.delete('drive_oauth_state')
   return response
