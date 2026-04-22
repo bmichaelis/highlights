@@ -62,18 +62,9 @@ export const driveConnections = sqliteTable('drive_connections', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   teamId: text('teamId').notNull().unique().references(() => teams.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull().references(() => users.id),
-  folderId: text('folderId').notNull(),
-  folderName: text('folderName').notNull(),
   accessToken: text('accessToken').notNull(),
   refreshToken: text('refreshToken').notNull(),
   expiresAt: integer('expiresAt', { mode: 'timestamp_ms' }),
-})
-
-export const players = sqliteTable('players', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  teamId: text('teamId').notNull().references(() => teams.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  folderName: text('folderName').notNull(),
 })
 
 export const projects = sqliteTable('projects', {
@@ -84,7 +75,16 @@ export const projects = sqliteTable('projects', {
   imagesPerPlayer: integer('imagesPerPlayer').notNull().default(4),
   secondsPerImage: real('secondsPerImage').notNull().default(3.5),
   audioR2Key: text('audioR2Key'),
+  folderId: text('folderId'),
+  folderName: text('folderName'),
   createdAt: integer('createdAt', { mode: 'timestamp_ms' }).default(now()),
+})
+
+export const players = sqliteTable('players', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('projectId').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  folderName: text('folderName').notNull(),
 })
 
 export const playlistItems = sqliteTable('playlist_items', {
