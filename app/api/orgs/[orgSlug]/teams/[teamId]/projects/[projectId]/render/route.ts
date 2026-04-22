@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireSession, requireOrgMember } from '@/lib/auth-helpers'
 import { getDb } from '@/db'
 import { organizations, teams, projects, playlistItems, driveConnections, renderJobs } from '@/db/schema'
-import { and, asc, eq, or } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { triggerRender } from '@/lib/github/actions'
 import { refreshDriveToken } from '@/lib/drive/auth'
 import { listFolderContents, pickAudioFiles } from '@/lib/drive/scanner'
@@ -57,6 +57,8 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Render already in progress' }, { status: 409 })
   }
 
+  if (!project.folderId) return NextResponse.json({ error: 'No folder set for this project' }, { status: 400 })
+
   let accessToken: string
   let audioFileIds: string[]
   try {
@@ -65,7 +67,7 @@ export async function POST(_req: Request, { params }: Params) {
     await db.update(driveConnections)
       .set({ accessToken, expiresAt: new Date(tokenData.expiresAt) })
       .where(eq(driveConnections.id, conn.id))
-    const files = await listFolderContents(conn.folderId, accessToken)
+    const files = await listFolderContents(project.folderId, accessToken)
     audioFileIds = pickAudioFiles(files).map((f) => f.id)
   } catch {
     return NextResponse.json({ error: 'Drive access failed. Reconnect Drive and try again.' }, { status: 502 })
@@ -106,7 +108,7 @@ export async function POST(_req: Request, { params }: Params) {
       playlist,
       audioFileIds,
       accessToken,
-      folderId: conn.folderId,
+      folderId: project.folderId,
       jobId: job.id,
       callbackUrl,
       callbackSecret,
