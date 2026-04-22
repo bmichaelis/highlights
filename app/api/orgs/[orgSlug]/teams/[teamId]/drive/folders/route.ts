@@ -24,9 +24,20 @@ export async function GET(req: Request, { params }: Params) {
   const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
-  const accessToken = await getFreshAccessToken(conn, db)
-  const files = await listFolderContents(parentId, accessToken)
-  const folders = parseDriveFiles(files)
+  let accessToken: string
+  try {
+    accessToken = await getFreshAccessToken(conn, db)
+  } catch {
+    return NextResponse.json({ error: 'Failed to authenticate with Drive' }, { status: 502 })
+  }
 
+  let files: Awaited<ReturnType<typeof listFolderContents>>
+  try {
+    files = await listFolderContents(parentId, accessToken)
+  } catch {
+    return NextResponse.json({ error: 'Failed to list Drive folders' }, { status: 502 })
+  }
+
+  const folders = parseDriveFiles(files)
   return NextResponse.json({ folders })
 }
