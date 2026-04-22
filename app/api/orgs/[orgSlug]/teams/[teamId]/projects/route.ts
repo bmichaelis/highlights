@@ -5,6 +5,7 @@ import { organizations, teams, projects, players, playlistItems, driveConnection
 import { and, eq } from 'drizzle-orm'
 import { buildPlaylist } from '@/lib/drive/sequencer'
 import { getFreshAccessToken } from '@/lib/drive/auth'
+import { listFolderContents, parseDriveFiles } from '@/lib/drive/scanner'
 
 type Params = { params: Promise<{ orgSlug: string; teamId: string }> }
 
@@ -25,14 +26,12 @@ export async function GET(_req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const session = await requireSession()
   const { orgSlug, teamId } = await params
-  let body: { name?: unknown; imagesPerPlayer?: unknown; secondsPerImage?: unknown }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
-  }
-  const { name, imagesPerPlayer = 4, secondsPerImage = 3.5 } = body
-  if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+  let body: { name?: unknown; imagesPerPlayer?: unknown; secondsPerImage?: unknown; folderId?: unknown; folderName?: unknown }
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request body' }, { status: 400 }) }
+  const { name, imagesPerPlayer = 4, secondsPerImage = 3.5, folderId, folderName } = body
+  if (typeof name !== 'string' || !name.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+  if (typeof folderId !== 'string' || !folderId.trim()) return NextResponse.json({ error: 'folderId required' }, { status: 400 })
+  if (typeof folderName !== 'string' || !folderName.trim()) return NextResponse.json({ error: 'folderName required' }, { status: 400 })
   const n = Number(imagesPerPlayer)
   const s = Number(secondsPerImage)
   if (!Number.isInteger(n) || n < 1 || n > 20) return NextResponse.json({ error: 'imagesPerPlayer must be an integer 1–20' }, { status: 400 })
@@ -50,14 +49,23 @@ export async function POST(req: Request, { params }: Params) {
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
   const [project] = await db.insert(projects).values({
-    teamId, name: name.trim(), imagesPerPlayer: n, secondsPerImage: s,
+    teamId,
+    name: name.trim(),
+    imagesPerPlayer: n,
+    secondsPerImage: s,
+    folderId: folderId.trim(),
+    folderName: folderName.trim(),
   }).returning()
 
-  const teamPlayers = await db.query.players.findMany({ where: eq(players.teamId, teamId) })
-  if (teamPlayers.length > 0) {
-    try {
-      const accessToken = await getFreshAccessToken(conn, db)
-      const playlist = await buildPlaylist(teamPlayers, conn.folderId, accessToken, n)
+  try {
+    const accessToken = await getFreshAccessToken(conn, db)
+    const files = await listFolderContents(folderId.trim(), accessToken)
+    const folderItems = parseDriveFiles(files)
+    if (folderItems.length > 0) {
+      const newPlayers = await db.insert(players).values(
+        folderItems.map((f) => ({ projectId: project.id, name: f.name, folderName: f.name }))
+      ).returning()
+      const playlist = await buildPlaylist(newPlayers, folderId.trim(), accessToken, n)
       if (playlist.length > 0) {
         await db.insert(playlistItems).values(
           playlist.map((item, i) => ({
@@ -65,15 +73,15 @@ export async function POST(req: Request, { params }: Params) {
             playerId: item.playerId,
             driveFileId: item.driveFileId,
             thumbnailUrl: item.thumbnailUrl,
-            exifDate: new Date(item.date),
+            exifDate: item.date ? new Date(item.date) : null,
             position: i,
           }))
         )
       }
-    } catch {
-      await db.delete(projects).where(eq(projects.id, project.id))
-      return NextResponse.json({ error: 'Failed to auto-sequence playlist from Drive. Check Drive connection and try again.' }, { status: 502 })
     }
+  } catch {
+    await db.delete(projects).where(eq(projects.id, project.id))
+    return NextResponse.json({ error: 'Failed to auto-sequence playlist from Drive. Check Drive connection and try again.' }, { status: 502 })
   }
 
   return NextResponse.json(project, { status: 201 })
