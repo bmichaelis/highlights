@@ -87,11 +87,12 @@ export async function PATCH(req: Request, { params }: Params) {
   if (body.type === 'resequence') {
     const project = await db.query.projects.findFirst({ where: and(eq(projects.id, projectId), eq(projects.teamId, teamId)) })
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!project.folderId) return NextResponse.json({ error: 'No folder set for this project' }, { status: 400 })
     const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
     if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
-    const teamPlayers = await db.query.players.findMany({ where: eq(players.teamId, teamId) })
+    const projectPlayers = await db.query.players.findMany({ where: eq(players.projectId, projectId) })
     const accessToken = await getFreshAccessToken(conn, db)
-    const playlist = await buildPlaylist(teamPlayers, conn.folderId, accessToken, project.imagesPerPlayer)
+    const playlist = await buildPlaylist(projectPlayers, project.folderId, accessToken, project.imagesPerPlayer)
 
     await db.transaction(async (tx) => {
       await tx.delete(playlistItems).where(eq(playlistItems.projectId, projectId))
@@ -102,7 +103,7 @@ export async function PATCH(req: Request, { params }: Params) {
             playerId: item.playerId,
             driveFileId: item.driveFileId,
             thumbnailUrl: item.thumbnailUrl,
-            exifDate: new Date(item.date),
+            exifDate: item.date ? new Date(item.date) : null,
             position: i,
           }))
         )
