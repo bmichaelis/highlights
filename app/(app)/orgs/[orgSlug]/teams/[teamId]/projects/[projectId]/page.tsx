@@ -73,46 +73,46 @@ export default function ProjectPage() {
     }
   }
 
-  if (!project) return <p className="p-8 text-gray-500">Loading…</p>
+  if (!project) return <p className="p-8 text-gray-400">Loading…</p>
 
   return (
     <main className="max-w-2xl mx-auto p-8 space-y-6">
       <div className="flex items-start justify-between">
-        <h1 className="text-2xl font-bold">{project.name}</h1>
+        <h1 className="text-2xl font-bold text-gray-100">{project.name}</h1>
         <div className="text-right">
           {project.folderName && (
-            <p className="text-xs text-gray-500 mb-1">Folder: {project.folderName}</p>
+            <p className="text-xs text-gray-400 mb-1">Folder: {project.folderName}</p>
           )}
           <button onClick={() => setShowFolderBrowser(true)}
-            className="text-xs text-blue-600 hover:underline">
+            className="text-xs text-blue-400 hover:underline">
             Change folder
           </button>
         </div>
       </div>
 
-      {folderError && <p className="text-sm text-red-600">{folderError}</p>}
+      {folderError && <p className="text-sm text-red-400">{folderError}</p>}
 
       {renderJob && (
         <div className={`p-4 rounded-lg border ${
-          renderJob.status === 'complete' ? 'border-green-300 bg-green-50' :
-          renderJob.status === 'failed' ? 'border-red-300 bg-red-50' :
-          'border-blue-300 bg-blue-50'
+          renderJob.status === 'complete' ? 'border-green-700 bg-green-900/30' :
+          renderJob.status === 'failed' ? 'border-red-700 bg-red-900/30' :
+          'border-blue-700 bg-blue-900/30'
         }`}>
-          {renderJob.status === 'pending' && <p>Queued — waiting for GitHub Actions runner…</p>}
-          {renderJob.status === 'running' && <p>Rendering… this takes 2–3 minutes.</p>}
+          {renderJob.status === 'pending' && <p className="text-gray-300">Queued — waiting for GitHub Actions runner…</p>}
+          {renderJob.status === 'running' && <p className="text-gray-300">Rendering… this takes 2–3 minutes.</p>}
           {renderJob.status === 'complete' && renderJob.outputDriveFileId && (
             <div className="space-y-2">
-              <p className="text-green-800 font-medium">Render complete!</p>
+              <p className="text-green-400 font-medium">Render complete!</p>
               <video src={`https://drive.google.com/uc?id=${renderJob.outputDriveFileId}&export=download`}
                 controls className="w-full rounded" />
               <a href={`https://drive.google.com/file/d/${renderJob.outputDriveFileId}/view`}
-                target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
+                target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 underline">
                 Open in Google Drive
               </a>
             </div>
           )}
           {renderJob.status === 'failed' && (
-            <p className="text-red-800">Render failed: {renderJob.errorMsg}</p>
+            <p className="text-red-400">Render failed: {renderJob.errorMsg}</p>
           )}
         </div>
       )}
@@ -135,19 +135,19 @@ export default function ProjectPage() {
       )}
 
       {pendingFolder && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full space-y-4">
-            <h2 className="text-lg font-semibold">Change folder?</h2>
-            <p className="text-sm text-gray-600">
-              Switching to <strong>{pendingFolder.name}</strong> will delete your current playlist and re-scan the new folder. This cannot be undone.
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 max-w-sm w-full space-y-4 mx-4">
+            <h2 className="text-lg font-semibold text-gray-100">Change folder?</h2>
+            <p className="text-sm text-gray-400">
+              Switching to <strong className="text-gray-200">{pendingFolder.name}</strong> will delete your current playlist and re-scan the new folder. This cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setPendingFolder(null)}
-                className="text-sm text-gray-500 hover:text-gray-700">
+                className="text-sm text-gray-400 hover:text-gray-200">
                 Cancel
               </button>
               <button onClick={handleConfirmFolderChange} disabled={changingFolder}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">
                 {changingFolder ? 'Changing…' : 'Continue'}
               </button>
             </div>

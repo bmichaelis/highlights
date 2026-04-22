@@ -15,7 +15,7 @@ export default function NewTeamPage() {
       body: JSON.stringify({ name }),
     })
     if (!res.ok) return
-    const team = await res.json()
+    const team = await res.json() as { id: string }
     router.push(`/orgs/${orgSlug}/teams/${team.id}`)
   }
 

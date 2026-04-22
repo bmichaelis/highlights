@@ -62,24 +62,30 @@ export async function POST(req: Request, { params }: Params) {
     const files = await listFolderContents(folderId.trim(), accessToken)
     const folderItems = parseDriveFiles(files)
     if (folderItems.length > 0) {
-      const newPlayers = await db.insert(players).values(
-        folderItems.map((f) => ({ projectId: project.id, name: f.name, folderName: f.name }))
-      ).returning()
+      // D1 limit: 100 bound params per statement. players=4/row → chunk 20; playlistItems=7/row → chunk 10
+      const newPlayers: { id: string; projectId: string; name: string; folderName: string }[] = []
+      for (let i = 0; i < folderItems.length; i += 20) {
+        const chunk = await db.insert(players).values(
+          folderItems.slice(i, i + 20).map((f) => ({ projectId: project.id, name: f.name, folderName: f.name }))
+        ).returning()
+        newPlayers.push(...chunk)
+      }
       const playlist = await buildPlaylist(newPlayers, folderId.trim(), accessToken, n)
-      if (playlist.length > 0) {
+      for (let i = 0; i < playlist.length; i += 10) {
         await db.insert(playlistItems).values(
-          playlist.map((item, i) => ({
+          playlist.slice(i, i + 10).map((item, idx) => ({
             projectId: project.id,
             playerId: item.playerId,
             driveFileId: item.driveFileId,
             thumbnailUrl: item.thumbnailUrl,
             exifDate: item.date ? new Date(item.date) : null,
-            position: i,
+            position: i + idx,
           }))
         )
       }
     }
-  } catch {
+  } catch (e) {
+    console.error('[project create] auto-sequence failed:', e)
     await db.delete(projects).where(eq(projects.id, project.id))
     return NextResponse.json({ error: 'Failed to auto-sequence playlist from Drive. Check Drive connection and try again.' }, { status: 502 })
   }

@@ -94,21 +94,20 @@ export async function PATCH(req: Request, { params }: Params) {
     const accessToken = await getFreshAccessToken(conn, db)
     const playlist = await buildPlaylist(projectPlayers, project.folderId, accessToken, project.imagesPerPlayer)
 
-    await db.transaction(async (tx) => {
-      await tx.delete(playlistItems).where(eq(playlistItems.projectId, projectId))
-      if (playlist.length > 0) {
-        await tx.insert(playlistItems).values(
-          playlist.map((item, i) => ({
-            projectId,
-            playerId: item.playerId,
-            driveFileId: item.driveFileId,
-            thumbnailUrl: item.thumbnailUrl,
-            exifDate: item.date ? new Date(item.date) : null,
-            position: i,
-          }))
-        )
-      }
-    })
+    await db.delete(playlistItems).where(eq(playlistItems.projectId, projectId))
+    // D1 limit: 100 bound params per statement; playlistItems=7/row → chunk 10
+    for (let i = 0; i < playlist.length; i += 10) {
+      await db.insert(playlistItems).values(
+        playlist.slice(i, i + 10).map((item, idx) => ({
+          projectId,
+          playerId: item.playerId,
+          driveFileId: item.driveFileId,
+          thumbnailUrl: item.thumbnailUrl,
+          exifDate: item.date ? new Date(item.date) : null,
+          position: i + idx,
+        }))
+      )
+    }
     return NextResponse.json({ ok: true })
   }
 

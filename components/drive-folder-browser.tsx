@@ -56,21 +56,21 @@ export function DriveFolderBrowser({ orgSlug, teamId, onSelect, onClose }: Props
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white max-w-lg w-full rounded-xl shadow-xl flex flex-col" style={{ maxHeight: '80vh' }}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-700 max-w-lg w-full rounded-xl shadow-2xl flex flex-col mx-4" style={{ maxHeight: '80vh' }}>
         {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b">
-          <h2 className="text-lg font-semibold mb-3">Browse Google Drive</h2>
+        <div className="px-6 pt-5 pb-4 border-b border-gray-700">
+          <h2 className="text-base font-semibold text-white mb-3">Browse Google Drive</h2>
           {/* Breadcrumbs */}
-          <nav className="flex flex-wrap items-center gap-1 text-sm text-gray-500">
+          <nav className="flex flex-wrap items-center gap-1 text-sm text-gray-400">
             {stack.map((item, i) => (
               <span key={item.id} className="flex items-center gap-1">
-                {i > 0 && <span>/</span>}
+                {i > 0 && <span className="text-gray-600">/</span>}
                 <button
                   onClick={() => navigateToBreadcrumb(i)}
                   className={i === stack.length - 1
-                    ? 'font-medium text-gray-900 cursor-default'
-                    : 'hover:text-blue-600 hover:underline'}
+                    ? 'font-medium text-gray-100 cursor-default'
+                    : 'hover:text-blue-400 hover:underline'}
                   disabled={i === stack.length - 1}
                 >
                   {item.name}
@@ -81,29 +81,29 @@ export function DriveFolderBrowser({ orgSlug, teamId, onSelect, onClose }: Props
         </div>
 
         {/* Folder list */}
-        <div className="overflow-y-auto flex-1 px-6 py-3">
+        <div className="overflow-y-auto flex-1 px-3 py-2">
           {loading && (
-            <p className="text-sm text-gray-400 py-4 text-center">Loading…</p>
+            <p className="text-sm text-gray-400 py-6 text-center">Loading…</p>
           )}
           {!loading && error && (
-            <p className="text-sm text-red-600 py-4">{error}</p>
+            <p className="text-sm text-red-400 py-4 px-3">{error}</p>
           )}
           {!loading && !error && folders.length === 0 && (
-            <p className="text-sm text-gray-400 py-4 text-center">No folders here.</p>
+            <p className="text-sm text-gray-500 py-6 text-center">No folders here.</p>
           )}
           {!loading && !error && folders.map((folder) => (
             <button
               key={folder.id}
               onClick={() => navigateTo(folder)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50 text-left text-sm"
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-800 text-left text-sm transition-colors"
             >
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <span className="flex items-center gap-2.5">
+                <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                 </svg>
-                {folder.name}
+                <span className="text-gray-200">{folder.name}</span>
               </span>
-              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -111,18 +111,18 @@ export function DriveFolderBrowser({ orgSlug, teamId, onSelect, onClose }: Props
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t flex justify-between items-center">
+        <div className="px-6 py-4 border-t border-gray-700 flex justify-between items-center">
           <button
             onClick={onClose}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-gray-400 hover:text-gray-200 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={() => onSelect(current.id, current.name)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm transition-colors"
           >
-            Select "{current.name}"
+            Select &ldquo;{current.name}&rdquo;
           </button>
         </div>
       </div>

@@ -4,6 +4,7 @@ import Google from 'next-auth/providers/google'
 export const authConfig: NextAuthConfig = {
   providers: [Google],
   pages: { signIn: '/login' },
+  trustHost: true,
   callbacks: {
     authorized({ auth }) { return !!auth },
     jwt({ token }) { return token },

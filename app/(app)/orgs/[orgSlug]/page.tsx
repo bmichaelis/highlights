@@ -23,6 +23,12 @@ export default async function OrgPage({ params }: { params: Promise<{ orgSlug: s
   return (
     <main className="max-w-2xl mx-auto p-8 space-y-6">
       <h1 className="text-2xl font-bold">{org.name}</h1>
+      <div className="flex justify-end">
+        <Link href="/onboarding" className="text-sm text-blue-600 hover:underline">
+          + New Organization
+        </Link>
+      </div>
+
       <section>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Teams</h2>

@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const session = await requireSession()
   const { orgSlug } = await params
-  const { name } = await req.json()
+  const { name } = await req.json() as { name?: string }
   if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
   const db = getDb()
   const org = await db.query.organizations.findFirst({ where: eq(organizations.slug, orgSlug) })

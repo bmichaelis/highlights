@@ -23,7 +23,7 @@ export async function GET(_req: Request, { params }: Params) {
 
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.searchParams.set('client_id', process.env.DRIVE_GOOGLE_CLIENT_ID!)
-  url.searchParams.set('redirect_uri', `${process.env.NEXTAUTH_URL}/api/orgs/${orgSlug}/teams/${teamId}/drive/callback`)
+  url.searchParams.set('redirect_uri', `${process.env.NEXTAUTH_URL}/api/drive/callback`)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', scopes)
   url.searchParams.set('access_type', 'offline')
