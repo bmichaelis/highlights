@@ -22,14 +22,14 @@ export async function PATCH(req: Request, { params }: Params) {
   const db = getDb()
   const org = await db.query.organizations.findFirst({ where: eq(organizations.slug, orgSlug) })
   if (!org) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const member = await requireOrgMember(org.id, session.user.id)
+  const member = await requireOrgMember(org.id, session.user.id, 'admin')
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const project = await db.query.projects.findFirst({ where: and(eq(projects.id, projectId), eq(projects.teamId, teamId)) })
   if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
-  await db.update(projects).set({ folderId, folderName }).where(eq(projects.id, projectId))
+  // Clear existing playlist/players
   await db.delete(playlistItems).where(eq(playlistItems.projectId, projectId))
   await db.delete(players).where(eq(players.projectId, projectId))
 
@@ -37,6 +37,10 @@ export async function PATCH(req: Request, { params }: Params) {
     const accessToken = await getFreshAccessToken(conn, db)
     const files = await listFolderContents(folderId, accessToken)
     const folderItems = parseDriveFiles(files)
+
+    // Only update folder metadata after confirming Drive is accessible
+    await db.update(projects).set({ folderId, folderName }).where(eq(projects.id, projectId))
+
     if (folderItems.length > 0) {
       const newPlayers = await db.insert(players).values(
         folderItems.map((f) => ({ projectId, name: f.name, folderName: f.name }))
