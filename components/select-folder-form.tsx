@@ -54,11 +54,13 @@ export function SelectFolderForm({ orgSlug, teamId }: Props) {
       if (!infoRes.ok) {
         const body = await infoRes.json() as { error?: string }
         setError(body.error ?? 'Could not access that folder.')
+        setLoading(false)
         return
       }
       const { name } = await infoRes.json() as { id: string; name: string }
       await saveFolder(folderId, name)
-    } finally {
+    } catch {
+      setError('Could not access that folder.')
       setLoading(false)
     }
   }
