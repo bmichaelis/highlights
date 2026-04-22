@@ -29,17 +29,15 @@ export async function PATCH(req: Request, { params }: Params) {
   const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
-  // Clear existing playlist/players
-  await db.delete(playlistItems).where(eq(playlistItems.projectId, projectId))
-  await db.delete(players).where(eq(players.projectId, projectId))
-
   try {
     const accessToken = await getFreshAccessToken(conn, db)
     const files = await listFolderContents(folderId, accessToken)
     const folderItems = parseDriveFiles(files)
 
-    // Only update folder metadata after confirming Drive is accessible
+    // Drive is confirmed accessible — now mutate the database
     await db.update(projects).set({ folderId, folderName }).where(eq(projects.id, projectId))
+    await db.delete(playlistItems).where(eq(playlistItems.projectId, projectId))
+    await db.delete(players).where(eq(players.projectId, projectId))
 
     if (folderItems.length > 0) {
       const newPlayers = await db.insert(players).values(
