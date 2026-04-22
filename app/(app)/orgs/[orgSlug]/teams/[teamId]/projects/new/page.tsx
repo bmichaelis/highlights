@@ -11,6 +11,7 @@ export default function NewProjectPage() {
   const [secondsPerImage, setSecondsPerImage] = useState(3.5)
   const [folderId, setFolderId] = useState('')
   const [folderName, setFolderName] = useState('')
+  const [folderUrl, setFolderUrl] = useState('')
   const [showBrowser, setShowBrowser] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +34,7 @@ export default function NewProjectPage() {
       const data = await res.json() as { id: string; name: string }
       setFolderId(data.id)
       setFolderName(data.name)
+      setFolderUrl('')
     } finally {
       setLoading(false)
     }
@@ -100,22 +102,20 @@ export default function NewProjectPage() {
               <p className="text-xs text-gray-400 text-center">or paste a folder URL</p>
               <div className="flex gap-2">
                 <input
-                  name="folderUrl"
                   placeholder="https://drive.google.com/drive/folders/..."
                   className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                  value={folderUrl}
+                  onChange={(e) => setFolderUrl(e.target.value)}
                   onKeyDown={async (e) => {
                     if (e.key !== 'Enter') return
                     e.preventDefault()
-                    await handleUrlInput((e.target as HTMLInputElement).value)
+                    await handleUrlInput(folderUrl)
                   }}
                 />
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={async (e) => {
-                    const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                    await handleUrlInput(input.value)
-                  }}
+                  onClick={() => handleUrlInput(folderUrl)}
                   className="bg-gray-100 border px-3 py-2 rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50"
                 >
                   {loading ? '…' : 'Set'}
