@@ -22,7 +22,12 @@ export default async function ProjectPage({ params }: Props) {
   if (!project) notFound()
 
   const items = await db
-    .select({ driveFileId: playlistItems.driveFileId, duration: playlistItems.durationOverride, position: playlistItems.position })
+    .select({
+      driveFileId: playlistItems.driveFileId,
+      duration: playlistItems.durationOverride,
+      position: playlistItems.position,
+      thumbnailUrl: playlistItems.thumbnailUrl,
+    })
     .from(playlistItems)
     .where(eq(playlistItems.projectId, projectId))
     .orderBy(asc(playlistItems.position))

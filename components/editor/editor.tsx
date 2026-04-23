@@ -17,19 +17,26 @@ type Props = {
   projectName: string
   projectSlug: string
   initialTimeline: TimelineType | null
-  playlistItems: { driveFileId: string; duration: number | null; position: number }[]
+  playlistItems: { driveFileId: string; duration: number | null; position: number; thumbnailUrl: string | null }[]
   secondsPerImage: number
 }
 
 function bootstrap(
-  playlistItems: { driveFileId: string; duration: number | null; position: number }[],
+  playlistItems: { driveFileId: string; duration: number | null; position: number; thumbnailUrl: string | null }[],
   secondsPerImage: number,
 ): TimelineType {
   const clips: Clip[] = playlistItems
     .sort((a, b) => a.position - b.position)
     .reduce<{ clips: Clip[]; cursor: number }>((acc, item, i) => {
       const dur = item.duration ?? secondsPerImage
-      acc.clips.push({ id: `boot-${i}`, mediaId: item.driveFileId, filename: item.driveFileId.slice(-8), start: acc.cursor, duration: dur })
+      acc.clips.push({
+        id: `boot-${i}`,
+        mediaId: item.driveFileId,
+        filename: item.driveFileId.slice(-8),
+        thumbnailUrl: item.thumbnailUrl ?? undefined,
+        start: acc.cursor,
+        duration: dur,
+      })
       acc.cursor += dur
       return acc
     }, { clips: [], cursor: 0 }).clips
@@ -55,6 +62,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [renderStatus, setRenderStatus] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const didMountRef = useRef(false)
   const rafRef = useRef<number | null>(null)
   const lastTimeRef = useRef<number | null>(null)
   const apiBase = `/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`
@@ -102,6 +110,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
 
   // Auto-save on timeline change
   useEffect(() => {
+    if (!didMountRef.current) { didMountRef.current = true; return }
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       setSaveStatus('saving')
@@ -172,6 +181,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
 
   function handleManualSave() {
     if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveStatus('saving')
     fetch(`${apiBase}/timeline`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
