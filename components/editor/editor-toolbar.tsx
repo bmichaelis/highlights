@@ -52,7 +52,22 @@ export function EditorToolbar({ snapOn, onSnapChange, canSplit, onSplit, showJso
         <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>Snap</span>
       </label>
 
-      <span style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'monospace', marginLeft: 'auto' }}>
+      <button
+        title="View ffmpeg JSON"
+        onClick={onToggleJson}
+        style={{
+          ...btnBase,
+          marginLeft: 'auto',
+          fontFamily: 'monospace',
+          color: showJson ? 'var(--accent)' : 'var(--ink-2)',
+          borderColor: showJson ? 'var(--accent)' : 'var(--line-soft)',
+          cursor: 'pointer',
+        }}
+      >
+        {'{ }'}
+      </button>
+
+      <span style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'monospace' }}>
         16:9 · 1920×1080 · 30fps
       </span>
 
