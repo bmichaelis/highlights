@@ -10,7 +10,7 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'unit', include: ['lib/**/*.test.ts', 'app/api/**/*.test.ts'], environment: 'node', setupFiles: ['./lib/test-setup.ts'] },
+        test: { name: 'unit', include: ['lib/**/*.test.ts', 'app/api/**/*.test.ts', 'components/**/*.test.ts'], environment: 'node', setupFiles: ['./lib/test-setup.ts'] },
       },
       {
         extends: true,
