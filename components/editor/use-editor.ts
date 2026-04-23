@@ -61,25 +61,23 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
       return pushHistory(state, next)
     }
     case 'SPLIT_CLIP': {
+      const track = state.present.tracks.find((t) => t.id === action.trackId)
+      const clip = track?.clips.find((c) => c.id === action.clipId)
+      if (!clip || action.at <= clip.start || action.at >= clip.start + clip.duration) return state
+      const left: Clip = { ...clip, duration: action.at - clip.start, fadeOut: 0 }
+      const right: Clip = {
+        ...clip,
+        id: crypto.randomUUID(),
+        start: action.at,
+        duration: (clip.start + clip.duration) - action.at,
+        fadeIn: 0,
+      }
       const next: Timeline = {
         ...state.present,
-        tracks: updateTrack(state.present.tracks, action.trackId, (clips) => {
-          const clip = clips.find((c) => c.id === action.clipId)
-          if (!clip || action.at <= clip.start || action.at >= clip.start + clip.duration) return clips
-          const left: Clip = { ...clip, duration: action.at - clip.start, fadeOut: 0 }
-          const right: Clip = {
-            ...clip,
-            id: crypto.randomUUID(),
-            start: action.at,
-            duration: (clip.start + clip.duration) - action.at,
-            fadeIn: 0,
-          }
-          return normalizeTrack([...clips.filter((c) => c.id !== action.clipId), left, right])
-        }),
+        tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
+          normalizeTrack([...clips.filter((c) => c.id !== action.clipId), left, right])
+        ),
       }
-      const trackBefore = state.present.tracks.find((t) => t.id === action.trackId)
-      const trackAfter = next.tracks.find((t) => t.id === action.trackId)
-      if (trackBefore?.clips === trackAfter?.clips) return state
       return pushHistory(state, next)
     }
     case 'UPDATE_CLIP': {
