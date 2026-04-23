@@ -77,6 +77,7 @@ export const projects = sqliteTable('projects', {
   audioR2Key: text('audioR2Key'),
   folderId: text('folderId'),
   folderName: text('folderName'),
+  timelineJson: text('timelineJson'),
   createdAt: integer('createdAt', { mode: 'timestamp_ms' }).default(now()),
 })
 
