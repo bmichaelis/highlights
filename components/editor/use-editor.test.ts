@@ -114,6 +114,22 @@ describe('editorReducer', () => {
       const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 2 })
       expect(next.past).toHaveLength(1)
     })
+
+    it('right clip inherits thumbnailUrl from original', () => {
+      const clipWithThumb: Clip = { id: 'c1', mediaId: 'drive-abc', filename: 'goal.jpg', thumbnailUrl: 'https://thumb.url', start: 0, duration: 6 }
+      const tl: Timeline = {
+        ...emptyTimeline,
+        tracks: [{ ...emptyTimeline.tracks[0], clips: [clipWithThumb] }, emptyTimeline.tracks[1]],
+      }
+      const next = editorReducer(makeHistory(tl), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 2 })
+      expect(next.present.tracks[0].clips[1].thumbnailUrl).toBe('https://thumb.url')
+    })
+
+    it('is a no-op when at equals clip start', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 0 })
+      expect(next.present.tracks[0].clips).toHaveLength(1)
+      expect(next.past).toHaveLength(0)
+    })
   })
 
   describe('UPDATE_CLIP', () => {
