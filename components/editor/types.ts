@@ -13,6 +13,8 @@ export type Clip = {
   thumbnailUrl?: string // images only
   start: number         // seconds from t=0
   duration: number      // seconds
+  fadeIn?: number       // seconds; undefined treated as 0.2
+  fadeOut?: number      // seconds; undefined treated as 0.2
 }
 
 export type Track = {
@@ -58,6 +60,8 @@ export type EditorAction =
   | { type: 'REMOVE_CLIP'; trackId: 'V1' | 'A1'; clipId: string }
   | { type: 'MOVE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; newStart: number }
   | { type: 'RESIZE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; newDuration: number }
+  | { type: 'SPLIT_CLIP'; trackId: 'V1' | 'A1'; clipId: string; at: number }
+  | { type: 'UPDATE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut'>> }
   | { type: 'TOGGLE_MUTE'; trackId: 'V1' | 'A1' }
   | { type: 'TOGGLE_LOCK'; trackId: 'V1' | 'A1' }
   | { type: 'UNDO' }
