@@ -60,6 +60,35 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
       }
       return pushHistory(state, next)
     }
+    case 'SPLIT_CLIP': {
+      const track = state.present.tracks.find((t) => t.id === action.trackId)
+      const clip = track?.clips.find((c) => c.id === action.clipId)
+      if (!clip || action.at <= clip.start || action.at >= clip.start + clip.duration) return state
+      const left: Clip = { ...clip, duration: action.at - clip.start, fadeOut: 0 }
+      const right: Clip = {
+        ...clip,
+        id: crypto.randomUUID(),
+        start: action.at,
+        duration: (clip.start + clip.duration) - action.at,
+        fadeIn: 0,
+      }
+      const next: Timeline = {
+        ...state.present,
+        tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
+          normalizeTrack([...clips.filter((c) => c.id !== action.clipId), left, right])
+        ),
+      }
+      return pushHistory(state, next)
+    }
+    case 'UPDATE_CLIP': {
+      const next: Timeline = {
+        ...state.present,
+        tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
+          clips.map((c) => c.id === action.clipId ? { ...c, ...action.patch } : c)
+        ),
+      }
+      return pushHistory(state, next)
+    }
     case 'TOGGLE_MUTE': {
       const next: Timeline = {
         ...state.present,
