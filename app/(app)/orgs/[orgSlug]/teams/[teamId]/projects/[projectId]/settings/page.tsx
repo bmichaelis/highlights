@@ -30,6 +30,15 @@ export default function ProjectSettingsPage() {
       .catch(() => {})
   }, [orgSlug, teamId, projectId])
 
+  useEffect(() => {
+    if (!renderJob || renderJob.status === 'complete' || renderJob.status === 'failed') return
+    const interval = setInterval(() => {
+      fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/render`)
+        .then((r) => r.json() as Promise<RenderJob>).then(setRenderJob)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [renderJob, orgSlug, teamId, projectId])
+
   async function handleConfirmFolderChange() {
     if (!pendingFolder) return
     setChangingFolder(true)
