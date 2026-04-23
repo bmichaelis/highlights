@@ -8,10 +8,10 @@ directory = ".open-next/assets"
 binding = "ASSETS"
 
 [vars]
-AUTH_GOOGLE_ID = ""
-DRIVE_GOOGLE_CLIENT_ID = ""
-NEXTAUTH_URL = "https://highlights.your-subdomain.workers.dev"
-GITHUB_OWNER = "placeholder-owner"
+AUTH_GOOGLE_ID = "540014896460-78no60qlh6c5f9uj5ukmhrh2erh3i5rr.apps.googleusercontent.com"
+DRIVE_GOOGLE_CLIENT_ID = "540014896460-78no60qlh6c5f9uj5ukmhrh2erh3i5rr.apps.googleusercontent.com"
+NEXTAUTH_URL = "https://highlights.kindacoach.com"
+GITHUB_OWNER = "bmichaelis"
 GITHUB_REPO = "highlights"
 
 [[services]]
