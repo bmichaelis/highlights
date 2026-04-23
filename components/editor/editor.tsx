@@ -8,6 +8,8 @@ import { EditorToolbar } from './editor-toolbar'
 import { MediaBrowser } from './media-browser'
 import { PreviewPanel } from './preview-panel'
 import { Timeline } from './timeline'
+import { InspectorPanel } from './inspector-panel'
+import { JsonPanel } from './json-panel'
 import type { Timeline as TimelineType, MediaItem, Clip, DragState, EditorAction } from './types'
 
 type Props = {
@@ -61,16 +63,35 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
   const [drag, setDrag] = useState<DragState | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [renderStatus, setRenderStatus] = useState<string | null>(null)
+  const [showJson, setShowJson] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const didMountRef = useRef(false)
   const rafRef = useRef<number | null>(null)
   const lastTimeRef = useRef<number | null>(null)
   const apiBase = `/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`
 
+  // Stable ref for values needed by keyboard handler (avoids stale closures in useEffect([]))
+  const editorStateRef = useRef({ timeline, playhead, snapOn })
+  useEffect(() => { editorStateRef.current = { timeline, playhead, snapOn } })
+
   const totalDuration = Math.max(
     ...timeline.tracks.flatMap((t) => t.clips.map((c) => c.start + c.duration)),
     0
   )
+
+  const canSplit = timeline.tracks.some((t) => {
+    if (t.locked) return false
+    return t.clips.some((c) => c.start < playhead && playhead < c.start + c.duration)
+  })
+
+  function handleSplit() {
+    const { timeline: tl, playhead: ph } = editorStateRef.current
+    for (const track of tl.tracks) {
+      if (track.locked) continue
+      const clip = track.clips.find((c) => c.start < ph && ph < c.start + c.duration)
+      if (clip) dispatch({ type: 'SPLIT_CLIP', trackId: track.id as 'V1' | 'A1', clipId: clip.id, at: ph })
+    }
+  }
 
   // Play loop
   useEffect(() => {
@@ -90,15 +111,28 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
   }, [playing, totalDuration])
 
-  // Keyboard: space = play/pause, undo/redo
+  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.target as HTMLElement).tagName === 'INPUT') return
-      if (e.code === 'Space') { e.preventDefault(); setPlaying((p) => !p) }
       const meta = e.metaKey || e.ctrlKey
+      if (e.code === 'Space') { e.preventDefault(); setPlaying((p) => !p) }
       if (meta && e.code === 'KeyZ' && !e.shiftKey) { e.preventDefault(); dispatch({ type: 'UNDO' }) }
       if (meta && e.code === 'KeyZ' && e.shiftKey) { e.preventDefault(); dispatch({ type: 'REDO' }) }
       if (meta && e.code === 'KeyY') { e.preventDefault(); dispatch({ type: 'REDO' }) }
+      if (e.code === 'KeyS' && !meta) {
+        e.preventDefault()
+        const { timeline: tl, playhead: ph } = editorStateRef.current
+        for (const track of tl.tracks) {
+          if (track.locked) continue
+          const clip = track.clips.find((c) => c.start < ph && ph < c.start + c.duration)
+          if (clip) dispatch({ type: 'SPLIT_CLIP', trackId: track.id as 'V1' | 'A1', clipId: clip.id, at: ph })
+        }
+      }
+      if (e.code === 'KeyN' && !meta) {
+        e.preventDefault()
+        setSnapOn((s) => !s)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -166,6 +200,10 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     setDrag(null)
   }, [drag])
 
+  const handleUpdateClip = useCallback((trackId: 'V1' | 'A1', clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut'>>) => {
+    dispatch({ type: 'UPDATE_CLIP', trackId, clipId, patch })
+  }, [])
+
   async function handleExport() {
     const ffmpegJson = toFFmpegJson(timeline, projectSlug)
     const res = await fetch(`${apiBase}/render`, {
@@ -212,7 +250,14 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
         onExport={handleExport}
         dispatch={dispatch as (a: { type: string }) => void}
       />
-      <EditorToolbar snapOn={snapOn} onSnapChange={setSnapOn} />
+      <EditorToolbar
+        snapOn={snapOn}
+        onSnapChange={setSnapOn}
+        canSplit={canSplit}
+        onSplit={handleSplit}
+        showJson={showJson}
+        onToggleJson={() => setShowJson((v) => !v)}
+      />
 
       <div className="flex flex-1 min-h-0">
         <MediaBrowser
@@ -230,6 +275,11 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
           onPlayPause={() => setPlaying((p) => !p)}
           onPrev={() => setPlayhead(prevTime)}
           onNext={() => setPlayhead(nextTime)}
+        />
+        <InspectorPanel
+          timeline={timeline}
+          selectedClipId={selectedClipId}
+          onUpdateClip={handleUpdateClip}
         />
       </div>
 
@@ -275,6 +325,14 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
             <img src={drag.media.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           )}
         </div>
+      )}
+
+      {showJson && (
+        <JsonPanel
+          timeline={timeline}
+          projectSlug={projectSlug}
+          onClose={() => setShowJson(false)}
+        />
       )}
     </div>
   )
