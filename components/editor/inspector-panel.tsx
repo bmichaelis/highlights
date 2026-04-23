@@ -87,6 +87,7 @@ function KBGrid({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 20px)', gap: 2 }}>
         {KB_POSITIONS.flat().map((pos) => (
           <button
+            type="button"
             key={pos}
             title={pos}
             onClick={() => onChange(pos)}
@@ -96,7 +97,7 @@ function KBGrid({
               border: `1px solid ${pos === value ? 'var(--accent)' : 'var(--line-soft)'}`,
               borderRadius: 2,
               background: pos === value ? 'var(--accent)' : 'var(--paper)',
-              opacity: pos === value ? 0.8 : 1,
+              opacity: pos === value ? 1 : 0.6,
               cursor: 'pointer',
               padding: 0,
             }}
