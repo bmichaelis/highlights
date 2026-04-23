@@ -1,159 +1,45 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { PlaylistEditor } from '@/components/playlist-editor'
-import { DriveFolderBrowser } from '@/components/drive-folder-browser'
+import { notFound } from 'next/navigation'
+import { requireSession, requireOrgMember } from '@/lib/auth-helpers'
+import { getDb } from '@/db'
+import { organizations, teams, projects, playlistItems } from '@/db/schema'
+import { and, asc, eq } from 'drizzle-orm'
+import { Editor } from '@/components/editor/editor'
 
-type Project = { id: string; name: string; status: string; secondsPerImage: number; folderId: string | null; folderName: string | null }
-type RenderJob = { id: string; status: string; outputDriveFileId: string | null; errorMsg: string | null }
+type Props = { params: Promise<{ orgSlug: string; teamId: string; projectId: string }> }
 
-export default function ProjectPage() {
-  const { orgSlug, teamId, projectId } = useParams<{ orgSlug: string; teamId: string; projectId: string }>()
-  const [project, setProject] = useState<Project | null>(null)
-  const [renderJob, setRenderJob] = useState<RenderJob | null>(null)
-  const [renderLoading, setRenderLoading] = useState(false)
-  const [showFolderBrowser, setShowFolderBrowser] = useState(false)
-  const [pendingFolder, setPendingFolder] = useState<{ id: string; name: string } | null>(null)
-  const [changingFolder, setChangingFolder] = useState(false)
-  const [folderError, setFolderError] = useState<string | null>(null)
+export default async function ProjectPage({ params }: Props) {
+  const { orgSlug, teamId, projectId } = await params
+  const session = await requireSession()
+  const db = getDb()
 
-  useEffect(() => {
-    fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`)
-      .then((r) => { if (!r.ok) return null; return r.json() as Promise<Project> })
-      .then((data) => setProject(data))
-      .catch(() => {})
-  }, [orgSlug, teamId, projectId])
+  const org = await db.query.organizations.findFirst({ where: eq(organizations.slug, orgSlug) })
+  if (!org) notFound()
+  const member = await requireOrgMember(org.id, session.user.id)
+  if (!member) notFound()
+  const team = await db.query.teams.findFirst({ where: and(eq(teams.id, teamId), eq(teams.orgId, org.id)) })
+  if (!team) notFound()
+  const project = await db.query.projects.findFirst({ where: and(eq(projects.id, projectId), eq(projects.teamId, teamId)) })
+  if (!project) notFound()
 
-  useEffect(() => {
-    fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/render`)
-      .then((r) => r.json() as Promise<RenderJob>)
-      .then((job) => { if (job?.id) setRenderJob(job) })
-      .catch(() => {})
-  }, [orgSlug, teamId, projectId])
+  const items = await db
+    .select({ driveFileId: playlistItems.driveFileId, duration: playlistItems.durationOverride, position: playlistItems.position })
+    .from(playlistItems)
+    .where(eq(playlistItems.projectId, projectId))
+    .orderBy(asc(playlistItems.position))
 
-  useEffect(() => {
-    if (!renderJob || renderJob.status === 'complete' || renderJob.status === 'failed') return
-    const interval = setInterval(() => {
-      fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/render`)
-        .then((r) => r.json() as Promise<RenderJob>).then(setRenderJob)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [renderJob, orgSlug, teamId, projectId])
-
-  async function handleRender() {
-    setRenderLoading(true)
-    try {
-      const res = await fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/render`, { method: 'POST' })
-      if (res.ok) {
-        const job = await res.json() as RenderJob
-        setRenderJob(job)
-        setProject((p) => p ? { ...p, status: 'rendering' } : p)
-      }
-    } finally {
-      setRenderLoading(false)
-    }
-  }
-
-  async function handleConfirmFolderChange() {
-    if (!pendingFolder) return
-    setChangingFolder(true)
-    setFolderError(null)
-    try {
-      const res = await fetch(`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/folder`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderId: pendingFolder.id, folderName: pendingFolder.name }),
-      })
-      if (!res.ok) { setFolderError('Failed to change folder.'); return }
-      const updated = await res.json() as Project
-      setProject(updated)
-      setPendingFolder(null)
-    } finally {
-      setChangingFolder(false)
-    }
-  }
-
-  if (!project) return <p className="p-8 text-gray-400">Loading…</p>
+  const initialTimeline = project.timelineJson ? JSON.parse(project.timelineJson) : null
+  const projectSlug = project.name.toLowerCase().replace(/\s+/g, '_')
 
   return (
-    <main className="max-w-2xl mx-auto p-8 space-y-6">
-      <div className="flex items-start justify-between">
-        <h1 className="text-2xl font-bold text-gray-100">{project.name}</h1>
-        <div className="text-right">
-          {project.folderName && (
-            <p className="text-xs text-gray-400 mb-1">Folder: {project.folderName}</p>
-          )}
-          <button onClick={() => setShowFolderBrowser(true)}
-            className="text-xs text-blue-400 hover:underline">
-            Change folder
-          </button>
-        </div>
-      </div>
-
-      {folderError && <p className="text-sm text-red-400">{folderError}</p>}
-
-      {renderJob && (
-        <div className={`p-4 rounded-lg border ${
-          renderJob.status === 'complete' ? 'border-green-700 bg-green-900/30' :
-          renderJob.status === 'failed' ? 'border-red-700 bg-red-900/30' :
-          'border-blue-700 bg-blue-900/30'
-        }`}>
-          {renderJob.status === 'pending' && <p className="text-gray-300">Queued — waiting for GitHub Actions runner…</p>}
-          {renderJob.status === 'running' && <p className="text-gray-300">Rendering… this takes 2–3 minutes.</p>}
-          {renderJob.status === 'complete' && renderJob.outputDriveFileId && (
-            <div className="space-y-2">
-              <p className="text-green-400 font-medium">Render complete!</p>
-              <video src={`https://drive.google.com/uc?id=${renderJob.outputDriveFileId}&export=download`}
-                controls className="w-full rounded" />
-              <a href={`https://drive.google.com/file/d/${renderJob.outputDriveFileId}/view`}
-                target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 underline">
-                Open in Google Drive
-              </a>
-            </div>
-          )}
-          {renderJob.status === 'failed' && (
-            <p className="text-red-400">Render failed: {renderJob.errorMsg}</p>
-          )}
-        </div>
-      )}
-
-      <PlaylistEditor
-        orgSlug={orgSlug} teamId={teamId} projectId={projectId}
-        defaultDuration={project.secondsPerImage}
-        projectStatus={project.status}
-        onRender={handleRender}
-        renderLoading={renderLoading}
-      />
-
-      {showFolderBrowser && (
-        <DriveFolderBrowser
-          orgSlug={orgSlug}
-          teamId={teamId}
-          onSelect={(id, name) => { setPendingFolder({ id, name }); setShowFolderBrowser(false) }}
-          onClose={() => setShowFolderBrowser(false)}
-        />
-      )}
-
-      {pendingFolder && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 max-w-sm w-full space-y-4 mx-4">
-            <h2 className="text-lg font-semibold text-gray-100">Change folder?</h2>
-            <p className="text-sm text-gray-400">
-              Switching to <strong className="text-gray-200">{pendingFolder.name}</strong> will delete your current playlist and re-scan the new folder. This cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setPendingFolder(null)}
-                className="text-sm text-gray-400 hover:text-gray-200">
-                Cancel
-              </button>
-              <button onClick={handleConfirmFolderChange} disabled={changingFolder}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">
-                {changingFolder ? 'Changing…' : 'Continue'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
+    <Editor
+      orgSlug={orgSlug}
+      teamId={teamId}
+      projectId={projectId}
+      projectName={project.name}
+      projectSlug={projectSlug}
+      initialTimeline={initialTimeline}
+      playlistItems={items}
+      secondsPerImage={project.secondsPerImage}
+    />
   )
 }
