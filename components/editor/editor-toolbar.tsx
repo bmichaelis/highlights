@@ -1,11 +1,24 @@
 'use client'
+import type { CSSProperties } from 'react'
 
 type Props = {
   snapOn: boolean
   onSnapChange: (on: boolean) => void
+  canSplit: boolean
+  onSplit: () => void
+  showJson: boolean
+  onToggleJson: () => void
 }
 
-export function EditorToolbar({ snapOn, onSnapChange }: Props) {
+export function EditorToolbar({ snapOn, onSnapChange, canSplit, onSplit, showJson, onToggleJson }: Props) {
+  const btnBase: CSSProperties = {
+    fontSize: 11,
+    border: '1px solid var(--line-soft)',
+    borderRadius: 3,
+    padding: '1px 8px',
+    background: 'transparent',
+  }
+
   return (
     <div
       className="flex items-center gap-2 px-3 shrink-0"
@@ -14,14 +27,15 @@ export function EditorToolbar({ snapOn, onSnapChange }: Props) {
       <button
         title="Import media (coming soon)"
         disabled
-        style={{ fontSize: 11, color: 'var(--ink-3)', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '1px 8px', background: 'transparent', cursor: 'not-allowed' }}
+        style={{ ...btnBase, color: 'var(--ink-3)', cursor: 'not-allowed' }}
       >
         ⬆ Import
       </button>
       <button
-        title="Split clip at playhead (coming soon)"
-        disabled
-        style={{ fontSize: 11, color: 'var(--ink-3)', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '1px 8px', background: 'transparent', cursor: 'not-allowed' }}
+        title={canSplit ? 'Split clip at playhead (S)' : 'Move playhead over a clip to split'}
+        disabled={!canSplit}
+        onClick={onSplit}
+        style={{ ...btnBase, color: canSplit ? 'var(--ink)' : 'var(--ink-3)', cursor: canSplit ? 'pointer' : 'not-allowed' }}
       >
         ✂ Split
       </button>
@@ -41,6 +55,20 @@ export function EditorToolbar({ snapOn, onSnapChange }: Props) {
       <span style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'monospace', marginLeft: 'auto' }}>
         16:9 · 1920×1080 · 30fps
       </span>
+
+      <button
+        title="View ffmpeg JSON"
+        onClick={onToggleJson}
+        style={{
+          ...btnBase,
+          fontFamily: 'monospace',
+          color: showJson ? 'var(--accent)' : 'var(--ink-2)',
+          borderColor: showJson ? 'var(--accent)' : 'var(--line-soft)',
+          cursor: 'pointer',
+        }}
+      >
+        {'{ }'}
+      </button>
     </div>
   )
 }
