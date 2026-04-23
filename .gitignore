@@ -51,3 +51,4 @@ test-project/
 
 # Superpowers brainstorm artifacts
 .superpowers/
+.worktrees/
