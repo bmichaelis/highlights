@@ -10,6 +10,7 @@ type FFmpegVideoClip = {
 type FFmpegAudioClip = {
   id: string; type: 'audio'; source: string
   in: number; out: number; start: number; end: number
+  fade: { in: number; out: number }
 }
 
 type FFmpegClip = FFmpegVideoClip | FFmpegAudioClip
@@ -29,9 +30,18 @@ function clipEnd(clip: Clip): number {
 function serializeClip(clip: Clip, kind: 'video' | 'audio'): FFmpegClip {
   const base = { id: clip.id, source: clip.mediaId, in: clip.start, out: clipEnd(clip), start: clip.start, end: clipEnd(clip) }
   if (kind === 'video') {
-    return { ...base, type: 'image', kenburns: { from: 'center', to: 'in', scale: 1.08 }, transition: { in: 'fade', duration: 0.2 } }
+    return {
+      ...base,
+      type: 'image',
+      kenburns: { from: 'center', to: 'in', scale: 1.08 },
+      transition: { in: 'fade', duration: clip.fadeIn ?? 0.2 },
+    }
   }
-  return { ...base, type: 'audio' }
+  return {
+    ...base,
+    type: 'audio',
+    fade: { in: clip.fadeIn ?? 0.2, out: clip.fadeOut ?? 0.2 },
+  }
 }
 
 function serializeTrack(track: Track): FFmpegTrack {
