@@ -93,6 +93,10 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     }
   }
 
+  // Ref to call stable handleSplit in keyboard handler
+  const handleSplitRef = useRef(handleSplit)
+  useEffect(() => { handleSplitRef.current = handleSplit })
+
   // Play loop
   useEffect(() => {
     if (!playing) { if (rafRef.current) cancelAnimationFrame(rafRef.current); lastTimeRef.current = null; return }
@@ -120,15 +124,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
       if (meta && e.code === 'KeyZ' && !e.shiftKey) { e.preventDefault(); dispatch({ type: 'UNDO' }) }
       if (meta && e.code === 'KeyZ' && e.shiftKey) { e.preventDefault(); dispatch({ type: 'REDO' }) }
       if (meta && e.code === 'KeyY') { e.preventDefault(); dispatch({ type: 'REDO' }) }
-      if (e.code === 'KeyS' && !meta) {
-        e.preventDefault()
-        const { timeline: tl, playhead: ph } = editorStateRef.current
-        for (const track of tl.tracks) {
-          if (track.locked) continue
-          const clip = track.clips.find((c) => c.start < ph && ph < c.start + c.duration)
-          if (clip) dispatch({ type: 'SPLIT_CLIP', trackId: track.id as 'V1' | 'A1', clipId: clip.id, at: ph })
-        }
-      }
+      if (e.code === 'KeyS' && !meta) { e.preventDefault(); handleSplitRef.current() }
       if (e.code === 'KeyN' && !meta) {
         e.preventDefault()
         setSnapOn((s) => !s)
