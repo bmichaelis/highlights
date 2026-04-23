@@ -163,5 +163,34 @@ describe('editorReducer', () => {
       const next = editorReducer(makeHistory(withClip), { type: 'UPDATE_CLIP', trackId: 'V1', clipId: 'c1', patch: { fadeIn: 0.3 } })
       expect(next.past).toHaveLength(1)
     })
+
+    it('patches kenBurns on a clip', () => {
+      const next = editorReducer(makeHistory(withClip), {
+        type: 'UPDATE_CLIP',
+        trackId: 'V1',
+        clipId: 'c1',
+        patch: { kenBurns: { from: 'top-left', to: 'bottom-right', scale: 1.1 } },
+      })
+      expect(next.present.tracks[0].clips[0].kenBurns).toEqual({
+        from: 'top-left',
+        to: 'bottom-right',
+        scale: 1.1,
+      })
+    })
+
+    it('patches kenBurns to null (disables Ken Burns)', () => {
+      const clipWithKB: Clip = { ...clipToUpdate, kenBurns: { from: 'center', to: 'bottom-right', scale: 1.08 } }
+      const tl: Timeline = {
+        ...emptyTimeline,
+        tracks: [{ ...emptyTimeline.tracks[0], clips: [clipWithKB] }, emptyTimeline.tracks[1]],
+      }
+      const next = editorReducer(makeHistory(tl), {
+        type: 'UPDATE_CLIP',
+        trackId: 'V1',
+        clipId: 'c1',
+        patch: { kenBurns: null },
+      })
+      expect(next.present.tracks[0].clips[0].kenBurns).toBeNull()
+    })
   })
 })

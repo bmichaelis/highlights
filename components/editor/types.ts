@@ -6,6 +6,11 @@ export type MediaItem = {
   defaultDuration: number  // seconds
 }
 
+export type KBPosition =
+  'top-left' | 'top' | 'top-right' |
+  'left'     | 'center' | 'right'  |
+  'bottom-left' | 'bottom' | 'bottom-right'
+
 export type Clip = {
   id: string
   mediaId: string       // Drive file ID (used as `source` in ffmpeg JSON)
@@ -15,6 +20,8 @@ export type Clip = {
   duration: number      // seconds
   fadeIn?: number       // seconds; undefined treated as 0.2
   fadeOut?: number      // seconds; undefined treated as 0.2
+  kenBurns?: { from: KBPosition; to: KBPosition; scale: number } | null
+  // undefined = use default (center→bottom-right, 1.08×); null = disabled (static)
 }
 
 export type Track = {
@@ -61,7 +68,7 @@ export type EditorAction =
   | { type: 'MOVE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; newStart: number }
   | { type: 'RESIZE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; newDuration: number }
   | { type: 'SPLIT_CLIP'; trackId: 'V1' | 'A1'; clipId: string; at: number }
-  | { type: 'UPDATE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut'>> }
+  | { type: 'UPDATE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>> }
   | { type: 'TOGGLE_MUTE'; trackId: 'V1' | 'A1' }
   | { type: 'TOGGLE_LOCK'; trackId: 'V1' | 'A1' }
   | { type: 'UNDO' }
