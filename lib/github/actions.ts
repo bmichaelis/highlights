@@ -6,6 +6,7 @@ export type RenderPayload = {
   jobId: string
   callbackUrl: string
   callbackSecret: string
+  timelineJson?: string  // serialized ffmpeg JSON; when present, playlist/audioFileIds are ignored by the worker
 }
 
 export async function triggerRender(payload: RenderPayload): Promise<void> {
@@ -21,6 +22,7 @@ export async function triggerRender(payload: RenderPayload): Promise<void> {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type': 'application/json',
+        'User-Agent': 'highlights-app',
       },
       body: JSON.stringify({
         event_type: 'render-video',
