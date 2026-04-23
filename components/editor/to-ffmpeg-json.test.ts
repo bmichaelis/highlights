@@ -77,4 +77,38 @@ describe('toFFmpegJson', () => {
     const v = result.tracks.find((t) => t.id === 'V1')
     expect(v?.muted).toBe(true)
   })
+
+  it('uses per-clip fadeIn for video transition duration', () => {
+    const tl: Timeline = {
+      ...timeline,
+      tracks: [
+        { ...timeline.tracks[0], clips: [{ ...timeline.tracks[0].clips[0], fadeIn: 0.8 }, timeline.tracks[0].clips[1]] },
+        timeline.tracks[1],
+      ],
+    }
+    const result = toFFmpegJson(tl, 'test')
+    const vTrack = result.tracks.find((t) => t.id === 'V1')!
+    expect(vTrack.clips[0]).toMatchObject({ transition: { in: 'fade', duration: 0.8 } })
+    // second clip has no fadeIn, should default to 0.2
+    expect(vTrack.clips[1]).toMatchObject({ transition: { in: 'fade', duration: 0.2 } })
+  })
+
+  it('adds fade field to audio clips with default 0.2', () => {
+    const result = toFFmpegJson(timeline, 'test')
+    const aTrack = result.tracks.find((t) => t.id === 'A1')!
+    expect(aTrack.clips[0]).toMatchObject({ fade: { in: 0.2, out: 0.2 } })
+  })
+
+  it('uses per-clip fadeIn/fadeOut for audio fade', () => {
+    const tl: Timeline = {
+      ...timeline,
+      tracks: [
+        timeline.tracks[0],
+        { ...timeline.tracks[1], clips: [{ ...timeline.tracks[1].clips[0], fadeIn: 1.0, fadeOut: 0.5 }] },
+      ],
+    }
+    const result = toFFmpegJson(tl, 'test')
+    const aTrack = result.tracks.find((t) => t.id === 'A1')!
+    expect(aTrack.clips[0]).toMatchObject({ fade: { in: 1.0, out: 0.5 } })
+  })
 })
