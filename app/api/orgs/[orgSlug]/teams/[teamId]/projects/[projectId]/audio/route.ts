@@ -3,8 +3,8 @@ import { requireSession, requireOrgMember } from '@/lib/auth-helpers'
 import { getDb } from '@/db'
 import { organizations, teams, projects, driveConnections } from '@/db/schema'
 import { and, eq } from 'drizzle-orm'
+import { refreshDriveToken } from '@/lib/drive/auth'
 import { listFolderContents, pickAudioFiles } from '@/lib/drive/scanner'
-import { getFreshAccessToken } from '@/lib/drive/auth'
 
 type Params = { params: Promise<{ orgSlug: string; teamId: string; projectId: string }> }
 
@@ -12,6 +12,7 @@ export async function GET(_req: Request, { params }: Params) {
   const session = await requireSession()
   const { orgSlug, teamId, projectId } = await params
   const db = getDb()
+
   const org = await db.query.organizations.findFirst({ where: eq(organizations.slug, orgSlug) })
   if (!org) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const member = await requireOrgMember(org.id, session.user.id)
@@ -19,10 +20,21 @@ export async function GET(_req: Request, { params }: Params) {
   const team = await db.query.teams.findFirst({ where: and(eq(teams.id, teamId), eq(teams.orgId, org.id)) })
   if (!team) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const project = await db.query.projects.findFirst({ where: and(eq(projects.id, projectId), eq(projects.teamId, teamId)) })
-  if (!project || !project.folderId) return NextResponse.json([])
+  if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!project.folderId) return NextResponse.json({ files: [] })
+
   const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
-  if (!conn) return NextResponse.json([])
-  const accessToken = await getFreshAccessToken(conn, db)
-  const files = await listFolderContents(project.folderId, accessToken)
-  return NextResponse.json(pickAudioFiles(files))
+  if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
+
+  try {
+    const tokenData = await refreshDriveToken(conn.refreshToken)
+    await db.update(driveConnections)
+      .set({ accessToken: tokenData.accessToken, expiresAt: new Date(tokenData.expiresAt) })
+      .where(eq(driveConnections.id, conn.id))
+    const files = await listFolderContents(project.folderId, tokenData.accessToken)
+    const audioFiles = pickAudioFiles(files)
+    return NextResponse.json({ files: audioFiles })
+  } catch {
+    return NextResponse.json({ error: 'Drive access failed' }, { status: 502 })
+  }
 }
