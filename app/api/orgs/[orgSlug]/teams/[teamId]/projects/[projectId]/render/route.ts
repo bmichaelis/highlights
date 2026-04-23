@@ -61,12 +61,10 @@ export async function POST(req: Request, { params }: Params) {
 
   // Parse optional timelineJson from body
   let timelineJson: string | undefined
-  try {
-    const body = await req.json().catch(() => ({})) as { timelineJson?: string }
-    if (typeof body.timelineJson === 'string') timelineJson = body.timelineJson
-  } catch { /* no body is fine */ }
+  const body = await req.json().catch(() => ({})) as { timelineJson?: string }
+  if (typeof body.timelineJson === 'string') timelineJson = body.timelineJson
 
-  let accessToken: string
+  let accessToken = ''
   let playlist: { driveFileId: string; duration: number }[] = []
   let audioFileIds: string[] = []
 
@@ -105,7 +103,7 @@ export async function POST(req: Request, { params }: Params) {
     await triggerRender({
       playlist,
       audioFileIds,
-      accessToken: accessToken!,
+      accessToken,
       folderId: project.folderId,
       jobId: job.id,
       callbackUrl,
