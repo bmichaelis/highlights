@@ -1,10 +1,22 @@
 'use client'
+import type { CSSProperties } from 'react'
 import type { Timeline, Clip } from './types'
 
 type Props = {
   timeline: Timeline
   selectedClipId: string | null
   onUpdateClip: (trackId: 'V1' | 'A1', clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut'>>) => void
+}
+
+const panelStyle: CSSProperties = {
+  width: 180,
+  flexShrink: 0,
+  background: 'var(--paper-2)',
+  borderLeft: '1.5px solid var(--line)',
+  padding: '10px',
+  display: 'flex',
+  flexDirection: 'column',
+  overflowY: 'auto',
 }
 
 function FadeControl({
@@ -54,17 +66,6 @@ function FadeControl({
 }
 
 export function InspectorPanel({ timeline, selectedClipId, onUpdateClip }: Props) {
-  const panelStyle: React.CSSProperties = {
-    width: 180,
-    flexShrink: 0,
-    background: 'var(--paper-2)',
-    borderLeft: '1.5px solid var(--line)',
-    padding: '10px',
-    display: 'flex',
-    flexDirection: 'column',
-    overflowY: 'auto',
-  }
-
   let selectedClip: Clip | null = null
   let selectedTrackId: 'V1' | 'A1' | null = null
   for (const track of timeline.tracks) {
