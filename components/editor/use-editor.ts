@@ -1,5 +1,5 @@
 'use client'
-import { useReducer, useEffect, useRef, useCallback } from 'react'
+import { useReducer, useEffect, useCallback, useState } from 'react'
 import type { Timeline, HistoryState, EditorAction, Clip, Track } from './types'
 
 const MAX_HISTORY = 40
@@ -57,7 +57,7 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
       const next: Timeline = {
         ...state.present,
         tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
-          clips.map((c) => c.id === action.clipId ? { ...c, duration: Math.max(0.3, action.newDuration) } : c)
+          normalizeTrack(clips.map((c) => c.id === action.clipId ? { ...c, duration: Math.max(0.3, action.newDuration) } : c))
         ),
       }
       return pushHistory(state, next)
@@ -113,40 +113,31 @@ type UseEditorOptions = {
 
 export function useEditor({ projectSlug, orgSlug, teamId, projectId }: UseEditorOptions) {
   const [history, dispatch] = useReducer(editorReducer, initialHistory())
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const saveStatus = useRef<'idle' | 'saving' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
   const apiBase = `/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`
 
   const save = useCallback(async (timeline: Timeline) => {
-    saveStatus.current = 'saving'
+    setSaveStatus('saving')
     try {
       await fetch(`${apiBase}/timeline`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ timeline }),
       })
-      saveStatus.current = 'saved'
+      setSaveStatus('saved')
     } catch {
-      saveStatus.current = 'idle'
+      setSaveStatus('idle')
     }
-  }, [apiBase])
-
-  const dispatchAndSave = useCallback((action: EditorAction) => {
-    dispatch(action)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      // history.present is stale here; the caller should pass the post-reduce timeline
-    }, 1000)
-  }, [])
+  }, [apiBase, setSaveStatus])
 
   // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey
-      if (e.code === 'Space' && !e.target || (e.target as HTMLElement).tagName !== 'INPUT') {
+      if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'INPUT') {
         e.preventDefault()
-        dispatch({ type: 'SET_PLAYING', playing: true } as unknown as EditorAction)
+        dispatch({ type: 'SET_PLAYING', playing: true })
       }
       if (meta && e.code === 'KeyZ' && !e.shiftKey) { e.preventDefault(); dispatch({ type: 'UNDO' }) }
       if (meta && e.code === 'KeyZ' && e.shiftKey) { e.preventDefault(); dispatch({ type: 'REDO' }) }
@@ -154,7 +145,7 @@ export function useEditor({ projectSlug, orgSlug, teamId, projectId }: UseEditor
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [dispatch])
 
-  return { history, dispatch, save, saveStatus: saveStatus.current, apiBase, projectSlug }
+  return { history, dispatch, save, saveStatus, apiBase, projectSlug }
 }
