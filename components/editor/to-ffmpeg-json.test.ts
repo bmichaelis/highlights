@@ -47,7 +47,7 @@ describe('toFFmpegJson', () => {
       out: 3,
       start: 0,
       end: 3,
-      kenburns: { from: 'center', to: 'in', scale: 1.08 },
+      kenburns: { from: 'center', to: 'bottom-right', scale: 1.08 },
       transition: { in: 'fade', duration: 0.2 },
     })
   })
@@ -110,5 +110,43 @@ describe('toFFmpegJson', () => {
     const result = toFFmpegJson(tl, 'test')
     const aTrack = result.tracks.find((t) => t.id === 'A1')!
     expect(aTrack.clips[0]).toMatchObject({ fade: { in: 1.0, out: 0.5 } })
+  })
+
+  it('uses per-clip kenBurns values when set', () => {
+    const tl: Timeline = {
+      ...timeline,
+      tracks: [
+        {
+          ...timeline.tracks[0],
+          clips: [{ ...timeline.tracks[0].clips[0], kenBurns: { from: 'top-left', to: 'bottom-right', scale: 1.15 } }, timeline.tracks[0].clips[1]],
+        },
+        timeline.tracks[1],
+      ],
+    }
+    const result = toFFmpegJson(tl, 'test')
+    const vTrack = result.tracks.find((t) => t.id === 'V1')!
+    expect(vTrack.clips[0]).toMatchObject({
+      kenburns: { from: 'top-left', to: 'bottom-right', scale: 1.15 },
+    })
+    // second clip has no kenBurns, should use default
+    expect(vTrack.clips[1]).toMatchObject({
+      kenburns: { from: 'center', to: 'bottom-right', scale: 1.08 },
+    })
+  })
+
+  it('emits kenburns: null when kenBurns is null (static clip)', () => {
+    const tl: Timeline = {
+      ...timeline,
+      tracks: [
+        {
+          ...timeline.tracks[0],
+          clips: [{ ...timeline.tracks[0].clips[0], kenBurns: null }, timeline.tracks[0].clips[1]],
+        },
+        timeline.tracks[1],
+      ],
+    }
+    const result = toFFmpegJson(tl, 'test')
+    const vTrack = result.tracks.find((t) => t.id === 'V1')!
+    expect((vTrack.clips[0] as { kenburns: unknown }).kenburns).toBeNull()
   })
 })

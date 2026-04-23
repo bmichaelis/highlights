@@ -1,9 +1,9 @@
-import type { Timeline, Clip, Track } from '@/components/editor/types'
+import type { Timeline, Clip, Track, KBPosition } from '@/components/editor/types'
 
 type FFmpegVideoClip = {
   id: string; type: 'image'; source: string
   in: number; out: number; start: number; end: number
-  kenburns: { from: string; to: string; scale: number }
+  kenburns: { from: KBPosition; to: KBPosition; scale: number } | null
   transition: { in: string; duration: number }
 }
 
@@ -23,6 +23,8 @@ type FFmpegJson = {
   tracks: FFmpegTrack[]
 }
 
+const DEFAULT_KB = { from: 'center' as KBPosition, to: 'bottom-right' as KBPosition, scale: 1.08 }
+
 function clipEnd(clip: Clip): number {
   return clip.start + clip.duration
 }
@@ -33,7 +35,7 @@ function serializeClip(clip: Clip, kind: 'video' | 'audio'): FFmpegClip {
     return {
       ...base,
       type: 'image',
-      kenburns: { from: 'center', to: 'in', scale: 1.08 },
+      kenburns: clip.kenBurns === null ? null : (clip.kenBurns ?? DEFAULT_KB),
       transition: { in: 'fade', duration: clip.fadeIn ?? 0.2 },
     }
   }
