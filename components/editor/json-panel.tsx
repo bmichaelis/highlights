@@ -26,7 +26,7 @@ export function JsonPanel({ timeline, projectSlug, onClose }: Props) {
     navigator.clipboard.writeText(json).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    })
+    }).catch(() => {})
   }
 
   const btnStyle: CSSProperties = {
