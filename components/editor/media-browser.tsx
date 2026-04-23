@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MediaItem } from './types'
 
 type PlaylistItem = {
@@ -21,10 +21,22 @@ export function MediaBrowser({ orgSlug, teamId, projectId, onDragStart }: Props)
   const [photos, setPhotos] = useState<PlaylistItem[]>([])
   const [audioFiles, setAudioFiles] = useState<{ id: string; name: string }[]>([])
   const [refreshing, setRefreshing] = useState(false)
+  const audioLoadedRef = useRef(false)
   const apiBase = `/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`
 
   useEffect(() => { loadPhotos() }, [projectId])
-  useEffect(() => { if (tab === 'audio') loadAudio() }, [tab, projectId])
+
+  useEffect(() => {
+    audioLoadedRef.current = false
+    setAudioFiles([])
+  }, [projectId])
+
+  useEffect(() => {
+    if (tab === 'audio' && !audioLoadedRef.current) {
+      audioLoadedRef.current = true
+      loadAudio()
+    }
+  }, [tab, projectId])
 
   async function loadPhotos() {
     const res = await fetch(`${apiBase}/playlist`)
