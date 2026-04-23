@@ -30,6 +30,10 @@ export function pickEvenly<T extends { date: number }>(items: T[], n: number): T
   return result
 }
 
+export function mergeChronological<T extends { date: number }>(playerImages: T[][]): T[] {
+  return playerImages.flat().sort((a, b) => a.date - b.date)
+}
+
 export function mergeInterspersed<T>(playerImages: T[][]): T[] {
   const queues = playerImages.filter((imgs) => imgs.length > 0).map((imgs) => [...imgs])
   const result: T[] = []
