@@ -41,5 +41,5 @@ bucket_name = "highlights-audio"
 [[d1_databases]]
 binding = "DB"
 database_name = "highlights-db"
-database_id = ""
+database_id = "fb97c033-3e94-4479-a532-5458ea93cf1d"
 migrations_dir = "db/migrations"
