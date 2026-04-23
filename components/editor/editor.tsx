@@ -196,7 +196,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     setDrag(null)
   }, [drag])
 
-  const handleUpdateClip = useCallback((trackId: 'V1' | 'A1', clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut'>>) => {
+  const handleUpdateClip = useCallback((trackId: 'V1' | 'A1', clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>>) => {
     dispatch({ type: 'UPDATE_CLIP', trackId, clipId, patch })
   }, [])
 

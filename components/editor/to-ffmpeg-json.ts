@@ -1,4 +1,5 @@
 import type { Timeline, Clip, Track, KBPosition } from '@/components/editor/types'
+import { DEFAULT_KB } from '@/components/editor/types'
 
 type FFmpegVideoClip = {
   id: string; type: 'image'; source: string
@@ -22,8 +23,6 @@ type FFmpegJson = {
   duration: number
   tracks: FFmpegTrack[]
 }
-
-const DEFAULT_KB = { from: 'center' as KBPosition, to: 'bottom-right' as KBPosition, scale: 1.08 }
 
 function clipEnd(clip: Clip): number {
   return clip.start + clip.duration
