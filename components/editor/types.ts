@@ -81,3 +81,9 @@ export type EditorAction =
   | { type: 'SET_DRAG'; drag: DragState | null }
   | { type: 'SET_SAVE_STATUS'; status: 'idle' | 'saving' | 'saved' }
   | { type: 'LOAD_TIMELINE'; timeline: Timeline }
+
+export const DEFAULT_KB: { from: KBPosition; to: KBPosition; scale: number } = {
+  from: 'center',
+  to: 'bottom-right',
+  scale: 1.08,
+}

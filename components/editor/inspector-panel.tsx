@@ -1,11 +1,12 @@
 'use client'
 import type { CSSProperties } from 'react'
-import type { Timeline, Clip } from './types'
+import type { Timeline, Clip, KBPosition } from './types'
+import { DEFAULT_KB } from './types'
 
 type Props = {
   timeline: Timeline
   selectedClipId: string | null
-  onUpdateClip: (trackId: 'V1' | 'A1', clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut'>>) => void
+  onUpdateClip: (trackId: 'V1' | 'A1', clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>>) => void
 }
 
 const panelStyle: CSSProperties = {
@@ -18,6 +19,12 @@ const panelStyle: CSSProperties = {
   flexDirection: 'column',
   overflowY: 'auto',
 }
+
+const KB_POSITIONS: KBPosition[][] = [
+  ['top-left', 'top', 'top-right'],
+  ['left', 'center', 'right'],
+  ['bottom-left', 'bottom', 'bottom-right'],
+]
 
 function FadeControl({
   label,
@@ -65,6 +72,41 @@ function FadeControl({
   )
 }
 
+function KBGrid({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: KBPosition
+  onChange: (v: KBPosition) => void
+}) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: 'var(--ink-3)', marginBottom: 3 }}>{label}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 20px)', gap: 2 }}>
+        {KB_POSITIONS.flat().map((pos) => (
+          <button
+            key={pos}
+            title={pos}
+            onClick={() => onChange(pos)}
+            style={{
+              width: 20,
+              height: 20,
+              border: `1px solid ${pos === value ? 'var(--accent)' : 'var(--line-soft)'}`,
+              borderRadius: 2,
+              background: pos === value ? 'var(--accent)' : 'var(--paper)',
+              opacity: pos === value ? 0.8 : 1,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function InspectorPanel({ timeline, selectedClipId, onUpdateClip }: Props) {
   let selectedClip: Clip | null = null
   let selectedTrackId: 'V1' | 'A1' | null = null
@@ -88,6 +130,9 @@ export function InspectorPanel({ timeline, selectedClipId, onUpdateClip }: Props
   const fadeIn = clip.fadeIn ?? 0.2
   const fadeOut = clip.fadeOut ?? 0.2
   const filename = clip.filename.length > 20 ? clip.filename.slice(0, 17) + '…' : clip.filename
+  const isVideo = trackId === 'V1'
+  const isOn = clip.kenBurns !== null
+  const effectiveKB = clip.kenBurns ?? DEFAULT_KB
 
   return (
     <div style={panelStyle}>
@@ -108,6 +153,54 @@ export function InspectorPanel({ timeline, selectedClipId, onUpdateClip }: Props
         value={fadeOut}
         onChange={(v) => onUpdateClip(trackId, clip.id, { fadeOut: v })}
       />
+      {isVideo && (
+        <>
+          <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '0 0 10px' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: 'var(--ink-2)' }}>Ken Burns</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={isOn}
+                onChange={(e) => onUpdateClip(trackId, clip.id, { kenBurns: e.target.checked ? DEFAULT_KB : null })}
+                style={{ accentColor: 'var(--accent)', width: 11, height: 11 }}
+              />
+              <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>{isOn ? 'on' : 'off'}</span>
+            </label>
+          </div>
+          {isOn && (
+            <>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <KBGrid
+                  label="Start"
+                  value={effectiveKB.from}
+                  onChange={(v) => onUpdateClip(trackId, clip.id, { kenBurns: { ...effectiveKB, from: v } })}
+                />
+                <KBGrid
+                  label="End"
+                  value={effectiveKB.to}
+                  onChange={(v) => onUpdateClip(trackId, clip.id, { kenBurns: { ...effectiveKB, to: v } })}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: 'var(--ink-2)' }}>Scale</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={1.3}
+                  step={0.01}
+                  value={effectiveKB.scale}
+                  onChange={(e) => onUpdateClip(trackId, clip.id, { kenBurns: { ...effectiveKB, scale: parseFloat(e.target.value) } })}
+                  style={{ width: 60, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 10, color: 'var(--ink)', minWidth: 30, textAlign: 'right', fontFamily: 'monospace' }}>
+                  {effectiveKB.scale.toFixed(2)}
+                </span>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }
