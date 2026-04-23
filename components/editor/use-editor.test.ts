@@ -73,4 +73,79 @@ describe('editorReducer', () => {
     }
     expect(state.past.length).toBeLessThanOrEqual(40)
   })
+
+  describe('SPLIT_CLIP', () => {
+    const clipToSplit: Clip = { id: 'c1', mediaId: 'drive-abc', filename: 'goal.jpg', start: 0, duration: 6 }
+    const withClip: Timeline = {
+      ...emptyTimeline,
+      tracks: [{ ...emptyTimeline.tracks[0], clips: [clipToSplit] }, emptyTimeline.tracks[1]],
+    }
+
+    it('splits clip into two clips at the given time', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 2 })
+      const clips = next.present.tracks[0].clips
+      expect(clips).toHaveLength(2)
+      expect(clips[0]).toMatchObject({ start: 0, duration: 2, fadeOut: 0 })
+      expect(clips[1]).toMatchObject({ start: 2, duration: 4, fadeIn: 0 })
+    })
+
+    it('left clip keeps original id', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 2 })
+      expect(next.present.tracks[0].clips[0].id).toBe('c1')
+    })
+
+    it('right clip gets a new id', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 2 })
+      expect(next.present.tracks[0].clips[1].id).not.toBe('c1')
+    })
+
+    it('right clip shares mediaId and filename with original', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 2 })
+      expect(next.present.tracks[0].clips[1]).toMatchObject({ mediaId: 'drive-abc', filename: 'goal.jpg' })
+    })
+
+    it('is a no-op when at is outside the clip', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 10 })
+      expect(next.present.tracks[0].clips).toHaveLength(1)
+      expect(next.past).toHaveLength(0)
+    })
+
+    it('pushes to undo history', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 2 })
+      expect(next.past).toHaveLength(1)
+    })
+  })
+
+  describe('UPDATE_CLIP', () => {
+    const clipToUpdate: Clip = { id: 'c1', mediaId: 'drive-abc', filename: 'goal.jpg', start: 0, duration: 3 }
+    const withClip: Timeline = {
+      ...emptyTimeline,
+      tracks: [{ ...emptyTimeline.tracks[0], clips: [clipToUpdate] }, emptyTimeline.tracks[1]],
+    }
+
+    it('patches fadeIn on a clip', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'UPDATE_CLIP', trackId: 'V1', clipId: 'c1', patch: { fadeIn: 0.5 } })
+      expect(next.present.tracks[0].clips[0].fadeIn).toBe(0.5)
+    })
+
+    it('patches fadeOut on a clip', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'UPDATE_CLIP', trackId: 'V1', clipId: 'c1', patch: { fadeOut: 1.0 } })
+      expect(next.present.tracks[0].clips[0].fadeOut).toBe(1.0)
+    })
+
+    it('does not modify other clips', () => {
+      const clip2: Clip = { id: 'c2', mediaId: 'drive-xyz', filename: 'pass.jpg', start: 3, duration: 3 }
+      const twoClips: Timeline = {
+        ...emptyTimeline,
+        tracks: [{ ...emptyTimeline.tracks[0], clips: [clipToUpdate, clip2] }, emptyTimeline.tracks[1]],
+      }
+      const next = editorReducer(makeHistory(twoClips), { type: 'UPDATE_CLIP', trackId: 'V1', clipId: 'c1', patch: { fadeIn: 0.8 } })
+      expect(next.present.tracks[0].clips[1].fadeIn).toBeUndefined()
+    })
+
+    it('pushes to undo history', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'UPDATE_CLIP', trackId: 'V1', clipId: 'c1', patch: { fadeIn: 0.3 } })
+      expect(next.past).toHaveLength(1)
+    })
+  })
 })
