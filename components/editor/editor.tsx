@@ -275,6 +275,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
           playhead={playhead}
           playing={playing}
           totalDuration={totalDuration}
+          audioBaseUrl={`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/audio`}
           onSeek={setPlayhead}
           onPlayPause={() => setPlaying((p) => !p)}
           onPrev={() => setPlayhead(prevTime)}
