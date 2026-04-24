@@ -51,6 +51,11 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
         loadedClipIdRef.current.set(track.id, activeAudioClip.id)
       } else if (!playing) {
         audio.currentTime = playhead - activeAudioClip.start
+      } else {
+        const expected = playhead - activeAudioClip.start
+        if (Math.abs(audio.currentTime - expected) > 0.25) {
+          audio.currentTime = expected
+        }
       }
       if (playing) {
         audio.play().catch((e: Error) => {
