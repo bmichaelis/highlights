@@ -25,11 +25,12 @@ export type Clip = {
 }
 
 export type Track = {
-  id: 'V1' | 'A1'
+  id: string
   kind: 'video' | 'audio'
   name: string
   muted: boolean
   locked: boolean
+  removable: boolean
   clips: Clip[]
 }
 
@@ -58,19 +59,21 @@ export type DragState = {
   media: MediaItem
   curX: number
   curY: number
-  overTrackId: 'V1' | 'A1' | null
+  overTrackId: string | null
   overTime: number      // seconds, snap-adjusted
 }
 
 export type EditorAction =
-  | { type: 'ADD_CLIP'; trackId: 'V1' | 'A1'; clip: Clip }
-  | { type: 'REMOVE_CLIP'; trackId: 'V1' | 'A1'; clipId: string }
-  | { type: 'MOVE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; newStart: number }
-  | { type: 'RESIZE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; newDuration: number }
-  | { type: 'SPLIT_CLIP'; trackId: 'V1' | 'A1'; clipId: string; at: number }
-  | { type: 'UPDATE_CLIP'; trackId: 'V1' | 'A1'; clipId: string; patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>> }
-  | { type: 'TOGGLE_MUTE'; trackId: 'V1' | 'A1' }
-  | { type: 'TOGGLE_LOCK'; trackId: 'V1' | 'A1' }
+  | { type: 'ADD_CLIP'; trackId: string; clip: Clip }
+  | { type: 'REMOVE_CLIP'; trackId: string; clipId: string }
+  | { type: 'MOVE_CLIP'; trackId: string; clipId: string; newStart: number }
+  | { type: 'RESIZE_CLIP'; trackId: string; clipId: string; newDuration: number }
+  | { type: 'SPLIT_CLIP'; trackId: string; clipId: string; at: number }
+  | { type: 'UPDATE_CLIP'; trackId: string; clipId: string; patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>> }
+  | { type: 'TOGGLE_MUTE'; trackId: string }
+  | { type: 'TOGGLE_LOCK'; trackId: string }
+  | { type: 'ADD_AUDIO_TRACK' }
+  | { type: 'REMOVE_AUDIO_TRACK'; trackId: string }
   | { type: 'UNDO' }
   | { type: 'REDO' }
   | { type: 'SET_PLAYHEAD'; time: number }
