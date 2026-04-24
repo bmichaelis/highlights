@@ -103,6 +103,31 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
       }
       return pushHistory(state, next)
     }
+    case 'ADD_AUDIO_TRACK': {
+      const audioNums = state.present.tracks.map((t) => {
+        const m = t.id.match(/^A(\d+)$/)
+        return m ? parseInt(m[1], 10) : 0
+      })
+      const nextN = Math.max(...audioNums) + 1
+      const newTrack: Track = {
+        id: `A${nextN}`,
+        kind: 'audio',
+        name: 'Audio',
+        muted: false,
+        locked: false,
+        removable: true,
+        clips: [],
+      }
+      return pushHistory(state, { ...state.present, tracks: [...state.present.tracks, newTrack] })
+    }
+    case 'REMOVE_AUDIO_TRACK': {
+      const track = state.present.tracks.find((t) => t.id === action.trackId)
+      if (!track?.removable) return state
+      return pushHistory(state, {
+        ...state.present,
+        tracks: state.present.tracks.filter((t) => t.id !== action.trackId),
+      })
+    }
     case 'UNDO': {
       if (state.past.length === 0) return state
       const [past, present] = [state.past.slice(0, -1), state.past[state.past.length - 1]]
@@ -122,8 +147,8 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
 
 export const emptyTimeline: Timeline = {
   tracks: [
-    { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, clips: [] },
-    { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, clips: [] },
+    { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, removable: false, clips: [] },
+    { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, removable: false, clips: [] },
   ],
 }
 

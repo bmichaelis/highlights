@@ -4,8 +4,8 @@ import type { HistoryState, Clip, Timeline } from './types'
 
 const emptyTimeline: Timeline = {
   tracks: [
-    { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, clips: [] },
-    { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, clips: [] },
+    { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, removable: false, clips: [] },
+    { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, removable: false, clips: [] },
   ],
 }
 
@@ -191,6 +191,74 @@ describe('editorReducer', () => {
         patch: { kenBurns: null },
       })
       expect(next.present.tracks[0].clips[0].kenBurns).toBeNull()
+    })
+  })
+
+  describe('ADD_AUDIO_TRACK', () => {
+    it('adds A2 when only A1 exists', () => {
+      const state = makeHistory(emptyTimeline)
+      const next = editorReducer(state, { type: 'ADD_AUDIO_TRACK' })
+      expect(next.present.tracks).toHaveLength(3)
+      const a2 = next.present.tracks[2]
+      expect(a2.id).toBe('A2')
+      expect(a2.kind).toBe('audio')
+      expect(a2.name).toBe('Audio')
+      expect(a2.removable).toBe(true)
+      expect(a2.clips).toEqual([])
+    })
+
+    it('adds A3 when A2 already exists', () => {
+      const state = makeHistory({
+        tracks: [
+          { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, removable: false, clips: [] },
+          { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, removable: false, clips: [] },
+          { id: 'A2', kind: 'audio', name: 'Audio', muted: false, locked: false, removable: true, clips: [] },
+        ],
+      })
+      const next = editorReducer(state, { type: 'ADD_AUDIO_TRACK' })
+      expect(next.present.tracks).toHaveLength(4)
+      expect(next.present.tracks[3].id).toBe('A3')
+    })
+
+    it('pushes to undo history', () => {
+      const state = makeHistory(emptyTimeline)
+      const next = editorReducer(state, { type: 'ADD_AUDIO_TRACK' })
+      expect(next.past).toHaveLength(1)
+    })
+  })
+
+  describe('REMOVE_AUDIO_TRACK', () => {
+    const audioClip: Clip = { id: 'ac1', mediaId: 'm1', filename: 'song.mp3', start: 0, duration: 5 }
+
+    it('removes the track and all its clips', () => {
+      const state = makeHistory({
+        tracks: [
+          { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, removable: false, clips: [] },
+          { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, removable: false, clips: [] },
+          { id: 'A2', kind: 'audio', name: 'Audio', muted: false, locked: false, removable: true, clips: [audioClip] },
+        ],
+      })
+      const next = editorReducer(state, { type: 'REMOVE_AUDIO_TRACK', trackId: 'A2' })
+      expect(next.present.tracks).toHaveLength(2)
+      expect(next.present.tracks.find((t) => t.id === 'A2')).toBeUndefined()
+    })
+
+    it('is a no-op for non-removable tracks', () => {
+      const state = makeHistory(emptyTimeline)
+      const next = editorReducer(state, { type: 'REMOVE_AUDIO_TRACK', trackId: 'A1' })
+      expect(next).toBe(state)
+    })
+
+    it('pushes to undo history when track is removed', () => {
+      const state = makeHistory({
+        tracks: [
+          { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, removable: false, clips: [] },
+          { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, removable: false, clips: [] },
+          { id: 'A2', kind: 'audio', name: 'Audio', muted: false, locked: false, removable: true, clips: [] },
+        ],
+      })
+      const next = editorReducer(state, { type: 'REMOVE_AUDIO_TRACK', trackId: 'A2' })
+      expect(next.past).toHaveLength(1)
     })
   })
 })
