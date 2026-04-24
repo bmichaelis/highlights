@@ -44,8 +44,8 @@ function bootstrap(
     }, { clips: [], cursor: 0 }).clips
   return {
     tracks: [
-      { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, clips },
-      { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, clips: [] },
+      { id: 'V1', kind: 'video', name: 'Photos', muted: false, locked: false, removable: false, clips },
+      { id: 'A1', kind: 'audio', name: 'Music', muted: false, locked: false, removable: false, clips: [] },
     ],
   }
 }
@@ -89,7 +89,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     for (const track of tl.tracks) {
       if (track.locked) continue
       const clip = track.clips.find((c) => c.start < ph && ph < c.start + c.duration)
-      if (clip) dispatch({ type: 'SPLIT_CLIP', trackId: track.id as 'V1' | 'A1', clipId: clip.id, at: ph })
+      if (clip) dispatch({ type: 'SPLIT_CLIP', trackId: track.id, clipId: clip.id, at: ph })
     }
   }
 
@@ -178,11 +178,11 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     setDrag({ media, curX: e.clientX, curY: e.clientY, overTrackId: null, overTime: 0 })
   }, [])
 
-  const handleDragOver = useCallback((trackId: 'V1' | 'A1' | null, time: number) => {
+  const handleDragOver = useCallback((trackId: string | null, time: number) => {
     setDrag((d) => d ? { ...d, overTrackId: trackId, overTime: time } : null)
   }, [])
 
-  const handleDrop = useCallback((trackId: 'V1' | 'A1', time: number) => {
+  const handleDrop = useCallback((trackId: string, time: number) => {
     if (!drag) return
     const newClip: Clip = {
       id: `c-${crypto.randomUUID()}`,
@@ -196,8 +196,16 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     setDrag(null)
   }, [drag])
 
-  const handleUpdateClip = useCallback((trackId: 'V1' | 'A1', clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>>) => {
+  const handleUpdateClip = useCallback((trackId: string, clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>>) => {
     dispatch({ type: 'UPDATE_CLIP', trackId, clipId, patch })
+  }, [])
+
+  const handleAddAudioTrack = useCallback(() => {
+    dispatch({ type: 'ADD_AUDIO_TRACK' })
+  }, [])
+
+  const handleRemoveAudioTrack = useCallback((trackId: string) => {
+    dispatch({ type: 'REMOVE_AUDIO_TRACK', trackId })
   }, [])
 
   async function handleExport() {
@@ -297,6 +305,8 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
         onToggleLock={(tid) => dispatch({ type: 'TOGGLE_LOCK', trackId: tid })}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onAddAudioTrack={handleAddAudioTrack}
+        onRemoveAudioTrack={handleRemoveAudioTrack}
       />
 
       {/* Drag ghost */}
