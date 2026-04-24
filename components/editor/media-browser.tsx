@@ -57,16 +57,19 @@ export function MediaBrowser({ orgSlug, teamId, projectId, onDragStart }: Props)
   }
 
   async function handleUpload(files: FileList | null) {
-    if (!files || files.length === 0) return
+    if (!files || files.length === 0 || uploadStatus) return
     const total = files.length
-    for (let i = 0; i < total; i++) {
-      setUploadStatus(`Uploading ${i + 1}/${total}…`)
-      const fd = new FormData()
-      fd.append('file', files[i])
-      await fetch(`${apiBase}/upload`, { method: 'POST', body: fd })
+    try {
+      for (let i = 0; i < total; i++) {
+        setUploadStatus(`Uploading ${i + 1}/${total}…`)
+        const fd = new FormData()
+        fd.append('file', files[i])
+        await fetch(`${apiBase}/upload`, { method: 'POST', body: fd })
+      }
+      setUploadGeneration((g) => g + 1)
+    } finally {
+      setUploadStatus(null)
     }
-    setUploadStatus(null)
-    setUploadGeneration((g) => g + 1)
   }
 
   async function handleRefresh() {
@@ -111,11 +114,11 @@ export function MediaBrowser({ orgSlug, teamId, projectId, onDragStart }: Props)
         <button style={tabStyle(tab === 'audio')} onClick={() => setTab('audio')}>Audio</button>
         <div style={{ flex: 1 }} />
         {uploadStatus ? (
-          <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>{uploadStatus}</span>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{uploadStatus}</span>
         ) : (
           <button
             onClick={() => (tab === 'photos' ? photoInputRef : audioInputRef).current?.click()}
-            style={{ fontSize: 10, color: 'var(--ink-3)', background: 'none', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '2px 6px', cursor: 'pointer' }}
+            style={{ fontSize: 11, color: 'var(--ink-3)', background: 'none', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '2px 6px', cursor: 'pointer' }}
           >
             Upload
           </button>
