@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 import type { Timeline, Clip } from './types'
 
 type Props = {
@@ -7,6 +7,7 @@ type Props = {
   playhead: number
   playing: boolean
   totalDuration: number
+  audioBaseUrl: string
   onSeek: (time: number) => void
   onPlayPause: () => void
   onPrev: () => void
@@ -25,9 +26,39 @@ function formatTime(secs: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function PreviewPanel({ timeline, playhead, playing, totalDuration, onSeek, onPlayPause, onPrev, onNext }: Props) {
+export function PreviewPanel({ timeline, playhead, playing, totalDuration, audioBaseUrl, onSeek, onPlayPause, onPrev, onNext }: Props) {
   const clip = activeClip(timeline, playhead)
   const scrubRef = useRef<HTMLDivElement>(null)
+  const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map())
+  const loadedClipIdRef = useRef<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    const audioTracks = timeline.tracks.filter((t) => t.kind === 'audio')
+    for (const track of audioTracks) {
+      const audio = audioRefs.current.get(track.id)
+      if (!audio) continue
+      const activeClip = track.clips.find(
+        (c) => c.start <= playhead && playhead < c.start + c.duration
+      ) ?? null
+      if (!activeClip || track.muted) {
+        audio.pause()
+        continue
+      }
+      const prevClipId = loadedClipIdRef.current.get(track.id)
+      if (prevClipId !== activeClip.id) {
+        audio.src = `${audioBaseUrl}/${activeClip.mediaId}`
+        audio.currentTime = playhead - activeClip.start
+        loadedClipIdRef.current.set(track.id, activeClip.id)
+      } else if (!playing) {
+        audio.currentTime = playhead - activeClip.start
+      }
+      if (playing) {
+        audio.play().catch(() => {})
+      } else {
+        audio.pause()
+      }
+    }
+  }, [playhead, playing, timeline, audioBaseUrl])
 
   const handleScrubClick = useCallback((e: React.MouseEvent) => {
     if (!scrubRef.current) return
@@ -113,6 +144,16 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, onSee
 
         <span style={{ fontSize: 14, color: 'var(--ink-3)' }}>🔊</span>
       </div>
+      {timeline.tracks.filter((t) => t.kind === 'audio').map((track) => (
+        <audio
+          key={track.id}
+          style={{ display: 'none' }}
+          ref={(el) => {
+            if (el) audioRefs.current.set(track.id, el)
+            else audioRefs.current.delete(track.id)
+          }}
+        />
+      ))}
     </div>
   )
 }
