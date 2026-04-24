@@ -21,22 +21,26 @@ export function MediaBrowser({ orgSlug, teamId, projectId, onDragStart }: Props)
   const [photos, setPhotos] = useState<PlaylistItem[]>([])
   const [audioFiles, setAudioFiles] = useState<{ id: string; name: string }[]>([])
   const [refreshing, setRefreshing] = useState(false)
+  const [uploadGeneration, setUploadGeneration] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
   const audioLoadedRef = useRef(false)
   const apiBase = `/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`
 
-  useEffect(() => { loadPhotos() }, [projectId])
+  useEffect(() => { loadPhotos() }, [projectId, uploadGeneration])
 
   useEffect(() => {
     audioLoadedRef.current = false
     setAudioFiles([])
-  }, [projectId])
+  }, [projectId, uploadGeneration])
 
   useEffect(() => {
     if (tab === 'audio' && !audioLoadedRef.current) {
       audioLoadedRef.current = true
       loadAudio()
     }
-  }, [tab, projectId])
+  }, [tab, projectId, uploadGeneration])
 
   async function loadPhotos() {
     const res = await fetch(`${apiBase}/playlist`)
@@ -50,6 +54,19 @@ export function MediaBrowser({ orgSlug, teamId, projectId, onDragStart }: Props)
     if (!res.ok) return
     const data = await res.json() as { files: { id: string; name: string }[] }
     setAudioFiles(data.files)
+  }
+
+  async function handleUpload(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const total = files.length
+    for (let i = 0; i < total; i++) {
+      setUploadStatus(`Uploading ${i + 1}/${total}…`)
+      const fd = new FormData()
+      fd.append('file', files[i])
+      await fetch(`${apiBase}/upload`, { method: 'POST', body: fd })
+    }
+    setUploadStatus(null)
+    setUploadGeneration((g) => g + 1)
   }
 
   async function handleRefresh() {
@@ -89,9 +106,36 @@ export function MediaBrowser({ orgSlug, teamId, projectId, onDragStart }: Props)
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 px-3 py-2">
+      <div className="flex items-center gap-2 px-3 py-2">
         <button style={tabStyle(tab === 'photos')} onClick={() => setTab('photos')}>Photos</button>
         <button style={tabStyle(tab === 'audio')} onClick={() => setTab('audio')}>Audio</button>
+        <div style={{ flex: 1 }} />
+        {uploadStatus ? (
+          <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>{uploadStatus}</span>
+        ) : (
+          <button
+            onClick={() => (tab === 'photos' ? photoInputRef : audioInputRef).current?.click()}
+            style={{ fontSize: 10, color: 'var(--ink-3)', background: 'none', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '2px 6px', cursor: 'pointer' }}
+          >
+            Upload
+          </button>
+        )}
+        <input
+          ref={photoInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => { handleUpload(e.target.files); e.target.value = '' }}
+        />
+        <input
+          ref={audioInputRef}
+          type="file"
+          multiple
+          accept="audio/*"
+          style={{ display: 'none' }}
+          onChange={(e) => { handleUpload(e.target.files); e.target.value = '' }}
+        />
       </div>
 
       {/* Content */}
