@@ -40,7 +40,8 @@ export async function POST(req: Request, { params }: Params) {
       .set({ accessToken: tokenData.accessToken, expiresAt: new Date(tokenData.expiresAt) })
       .where(eq(driveConnections.id, conn.id))
 
-    const metadata = JSON.stringify({ name: file.name, parents: [project.folderId] })
+    const safeName = file.name.replace(/[/\\]/g, '_').slice(0, 255) || 'upload'
+    const metadata = JSON.stringify({ name: safeName, parents: [project.folderId] })
     const fileBytes = await file.arrayBuffer()
     const boundary = 'boundary' + Date.now()
     const encoder = new TextEncoder()
@@ -62,7 +63,7 @@ export async function POST(req: Request, { params }: Params) {
     body.set(closing, metaPart.byteLength + mediaHeader.byteLength + fileBytes.byteLength)
 
     const driveRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType',
       {
         method: 'POST',
         headers: {
