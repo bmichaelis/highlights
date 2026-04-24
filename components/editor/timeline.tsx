@@ -12,14 +12,16 @@ type Props = {
   totalDuration: number
   onSeekRuler: (time: number) => void
   onZoomChange: (zoom: number) => void
-  onMoveClip: (trackId: 'V1' | 'A1', clipId: string, newStart: number) => void
-  onResizeClip: (trackId: 'V1' | 'A1', clipId: string, newDuration: number) => void
-  onRemoveClip: (trackId: 'V1' | 'A1', clipId: string) => void
+  onMoveClip: (trackId: string, clipId: string, newStart: number) => void
+  onResizeClip: (trackId: string, clipId: string, newDuration: number) => void
+  onRemoveClip: (trackId: string, clipId: string) => void
   onSelectClip: (clipId: string | null) => void
-  onToggleMute: (trackId: 'V1' | 'A1') => void
-  onToggleLock: (trackId: 'V1' | 'A1') => void
-  onDragOver: (trackId: 'V1' | 'A1' | null, time: number) => void
-  onDrop: (trackId: 'V1' | 'A1', time: number) => void
+  onToggleMute: (trackId: string) => void
+  onToggleLock: (trackId: string) => void
+  onDragOver: (trackId: string | null, time: number) => void
+  onDrop: (trackId: string, time: number) => void
+  onAddAudioTrack: () => void
+  onRemoveAudioTrack: (trackId: string) => void
 }
 
 function pps(zoom: number) { return zoom * 0.8 }
@@ -97,6 +99,7 @@ export function Timeline({
   timeline, playhead, zoom, selectedClipId, snapOn, drag, totalDuration,
   onSeekRuler, onZoomChange, onMoveClip, onResizeClip, onRemoveClip,
   onSelectClip, onToggleMute, onToggleLock, onDragOver, onDrop,
+  onAddAudioTrack, onRemoveAudioTrack,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const pixelsPerSecond = pps(zoom)
@@ -125,7 +128,7 @@ export function Timeline({
     function onMove(ev: MouseEvent) {
       const dx = ev.clientX - origX
       const newStart = snapTime(Math.max(0, origStart + dx / pixelsPerSecond), otherClips, snapOn, pixelsPerSecond)
-      onMoveClip(track.id as 'V1' | 'A1', clip.id, newStart)
+      onMoveClip(track.id, clip.id, newStart)
     }
     function onUp() {
       window.removeEventListener('mousemove', onMove)
@@ -144,7 +147,7 @@ export function Timeline({
 
     function onMove(ev: MouseEvent) {
       const dx = ev.clientX - origX
-      onResizeClip(track.id as 'V1' | 'A1', clip.id, Math.max(0.3, origDur + dx / pixelsPerSecond))
+      onResizeClip(track.id, clip.id, Math.max(0.3, origDur + dx / pixelsPerSecond))
     }
     function onUp() {
       window.removeEventListener('mousemove', onMove)
@@ -159,7 +162,7 @@ export function Timeline({
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
       for (const track of timeline.tracks) {
         if (track.clips.some((c) => c.id === selectedClipId)) {
-          onRemoveClip(track.id as 'V1' | 'A1', selectedClipId)
+          onRemoveClip(track.id, selectedClipId)
           break
         }
       }
@@ -174,7 +177,7 @@ export function Timeline({
     const scrollLeft = scrollRef.current.scrollLeft
     const rawTime = (e.clientX - rect.left + scrollLeft - 140) / pixelsPerSecond
     const snapped = snapTime(Math.max(0, rawTime), track.clips, snapOn, pixelsPerSecond)
-    onDragOver(track.id as 'V1' | 'A1', snapped)
+    onDragOver(track.id, snapped)
   }, [drag, pixelsPerSecond, snapOn, onDragOver])
 
   const handleTrackPointerUp = useCallback((e: React.PointerEvent, track: Track) => {
@@ -186,7 +189,7 @@ export function Timeline({
     const scrollLeft = scrollRef.current.scrollLeft
     const rawTime = (e.clientX - rect.left + scrollLeft - 140) / pixelsPerSecond
     const snapped = snapTime(Math.max(0, rawTime), track.clips, snapOn, pixelsPerSecond)
-    onDrop(track.id as 'V1' | 'A1', snapped)
+    onDrop(track.id, snapped)
   }, [drag, pixelsPerSecond, snapOn, onDragOver, onDrop])
 
   // Ruler ticks
@@ -207,7 +210,10 @@ export function Timeline({
       <div className="flex items-center gap-2 px-3 shrink-0" style={{ height: 36, borderBottom: '1px solid var(--line-soft)' }}>
         <span style={{ fontSize: 20, fontWeight: 600, fontFamily: 'Caveat, cursive', color: 'var(--ink)' }}>Timeline</span>
         <button disabled style={{ fontSize: 10, color: 'var(--ink-3)', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '1px 6px', background: 'transparent', cursor: 'not-allowed' }}>+ Video track</button>
-        <button disabled style={{ fontSize: 10, color: 'var(--ink-3)', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '1px 6px', background: 'transparent', cursor: 'not-allowed' }}>+ Audio track</button>
+        <button
+          onClick={onAddAudioTrack}
+          style={{ fontSize: 10, color: 'var(--ink-2)', border: '1px solid var(--line-soft)', borderRadius: 3, padding: '1px 6px', background: 'transparent', cursor: 'pointer' }}
+        >+ Audio track</button>
         <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--ink-3)', marginLeft: 'auto' }}>{clipCount} clips · {totalDuration.toFixed(1)}s</span>
         <label className="flex items-center gap-1">
           <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>Zoom</span>
@@ -277,15 +283,22 @@ export function Timeline({
                 <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--accent)', fontWeight: 600 }}>{track.id}</span>
                 <span style={{ fontSize: 10, color: 'var(--ink-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</span>
                 <button
-                  onClick={() => onToggleMute(track.id as 'V1' | 'A1')}
+                  onClick={() => onToggleMute(track.id)}
                   style={{ fontSize: 9, fontWeight: 700, color: track.muted ? 'var(--accent)' : 'var(--ink-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px' }}
                   title="Mute"
                 >M</button>
                 <button
-                  onClick={() => onToggleLock(track.id as 'V1' | 'A1')}
+                  onClick={() => onToggleLock(track.id)}
                   style={{ fontSize: 9, color: track.locked ? 'var(--accent)' : 'var(--ink-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px' }}
                   title="Lock"
                 >🔒</button>
+                {track.removable && (
+                  <button
+                    onClick={() => onRemoveAudioTrack(track.id)}
+                    style={{ fontSize: 9, color: 'var(--ink-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px' }}
+                    title="Remove track"
+                  >✕</button>
+                )}
               </div>
 
               {/* Clip area */}
