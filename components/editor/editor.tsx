@@ -69,6 +69,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
   const rafRef = useRef<number | null>(null)
   const lastTimeRef = useRef<number | null>(null)
   const apiBase = `/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`
+  const audioBase = `${apiBase}/audio`
 
   // Stable ref for values needed by keyboard handler (avoids stale closures in useEffect([]))
   const editorStateRef = useRef({ timeline, playhead, snapOn })
@@ -275,7 +276,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
           playhead={playhead}
           playing={playing}
           totalDuration={totalDuration}
-          audioBaseUrl={`/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}/audio`}
+          audioBaseUrl={audioBase}
           onSeek={setPlayhead}
           onPlayPause={() => setPlaying((p) => !p)}
           onPrev={() => setPlayhead(prevTime)}
