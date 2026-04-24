@@ -34,6 +34,10 @@ export async function POST(req: Request, { params }: Params) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
+  if (file.type && !/^(image\/|audio\/)/.test(file.type)) {
+    return NextResponse.json({ error: 'Unsupported file type' }, { status: 415 })
+  }
+
   try {
     const tokenData = await refreshDriveToken(conn.refreshToken)
     await db.update(driveConnections)

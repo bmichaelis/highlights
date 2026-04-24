@@ -66,6 +66,13 @@ export function MediaBrowser({ orgSlug, teamId, projectId, onDragStart }: Props)
         fd.append('file', files[i])
         await fetch(`${apiBase}/upload`, { method: 'POST', body: fd })
       }
+      if (tab === 'photos') {
+        await fetch(`${apiBase}/playlist`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'resequence' }),
+        })
+      }
       setUploadGeneration((g) => g + 1)
     } finally {
       setUploadStatus(null)
