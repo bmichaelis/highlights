@@ -108,7 +108,7 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
         const m = t.id.match(/^A(\d+)$/)
         return m ? parseInt(m[1], 10) : 0
       })
-      const nextN = Math.max(...audioNums) + 1
+      const nextN = Math.max(0, ...audioNums) + 1
       const newTrack: Track = {
         id: `A${nextN}`,
         kind: 'audio',
