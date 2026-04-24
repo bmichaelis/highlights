@@ -37,25 +37,30 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
     for (const track of audioTracks) {
       const audio = audioRefs.current.get(track.id)
       if (!audio) continue
-      const activeClip = track.clips.find(
+      const activeAudioClip = track.clips.find(
         (c) => c.start <= playhead && playhead < c.start + c.duration
       ) ?? null
-      if (!activeClip || track.muted) {
+      if (!activeAudioClip || track.muted) {
         audio.pause()
         continue
       }
       const prevClipId = loadedClipIdRef.current.get(track.id)
-      if (prevClipId !== activeClip.id) {
-        audio.src = `${audioBaseUrl}/${activeClip.mediaId}`
-        audio.currentTime = playhead - activeClip.start
-        loadedClipIdRef.current.set(track.id, activeClip.id)
+      if (prevClipId !== activeAudioClip.id) {
+        audio.src = `${audioBaseUrl}/${activeAudioClip.mediaId}`
+        audio.currentTime = playhead - activeAudioClip.start
+        loadedClipIdRef.current.set(track.id, activeAudioClip.id)
+        if (playing) {
+          audio.addEventListener('canplay', () => audio.play().catch((e: Error) => {
+            if (e.name !== 'AbortError') console.warn('Audio play failed', e)
+          }), { once: true })
+        }
       } else if (!playing) {
-        audio.currentTime = playhead - activeClip.start
-      }
-      if (playing) {
-        audio.play().catch(() => {})
-      } else {
+        audio.currentTime = playhead - activeAudioClip.start
         audio.pause()
+      } else {
+        audio.play().catch((e: Error) => {
+          if (e.name !== 'AbortError') console.warn('Audio play failed', e)
+        })
       }
     }
   }, [playhead, playing, timeline, audioBaseUrl])
@@ -149,8 +154,13 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
           key={track.id}
           style={{ display: 'none' }}
           ref={(el) => {
-            if (el) audioRefs.current.set(track.id, el)
-            else audioRefs.current.delete(track.id)
+            if (el) {
+              audioRefs.current.set(track.id, el)
+            } else {
+              audioRefs.current.get(track.id)?.pause()
+              audioRefs.current.delete(track.id)
+              loadedClipIdRef.current.delete(track.id)
+            }
           }}
         />
       ))}
