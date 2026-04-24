@@ -49,18 +49,15 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
         audio.src = `${audioBaseUrl}/${activeAudioClip.mediaId}`
         audio.currentTime = playhead - activeAudioClip.start
         loadedClipIdRef.current.set(track.id, activeAudioClip.id)
-        if (playing) {
-          audio.addEventListener('canplay', () => audio.play().catch((e: Error) => {
-            if (e.name !== 'AbortError') console.warn('Audio play failed', e)
-          }), { once: true })
-        }
       } else if (!playing) {
         audio.currentTime = playhead - activeAudioClip.start
-        audio.pause()
-      } else {
+      }
+      if (playing) {
         audio.play().catch((e: Error) => {
           if (e.name !== 'AbortError') console.warn('Audio play failed', e)
         })
+      } else {
+        audio.pause()
       }
     }
   }, [playhead, playing, timeline, audioBaseUrl])
