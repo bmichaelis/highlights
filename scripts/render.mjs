@@ -129,7 +129,59 @@ try {
       segPaths.push(seg)
       console.log(`Rendered video segment ${i + 1}/${videoClips.length}`)
     }
-    // AUDIO PROCESSING — Task 4
+    // Per-clip audio: trim source → apply fades → delay to timeline position
+    const delayedAudioPaths = []
+    let audioClipIdx = 0
+    for (const track of audioTracks) {
+      for (const clip of track.clips) {
+        const src = audioSources.get(clip.source)
+        const clipDur = clip.out - clip.in
+        const trimmed = `${TMP}/audio/trimmed_${audioClipIdx}.aac`
+        const faded   = `${TMP}/audio/faded_${audioClipIdx}.aac`
+        const delayed = `${TMP}/audio/delayed_${audioClipIdx}.aac`
+
+        execSync(
+          `ffmpeg -y -ss ${clip.in} -t ${clipDur} -i "${src}" -c:a aac "${trimmed}"`,
+          { stdio: 'inherit' }
+        )
+
+        const fadeOutSt = clipDur - clip.fade.out
+        execSync(
+          `ffmpeg -y -i "${trimmed}" ` +
+          `-af "afade=t=in:st=0:d=${clip.fade.in},afade=t=out:st=${fadeOutSt.toFixed(3)}:d=${clip.fade.out}" ` +
+          `"${faded}"`,
+          { stdio: 'inherit' }
+        )
+
+        const delayMs = Math.round(clip.start * 1000)
+        execSync(
+          `ffmpeg -y -i "${faded}" -af "adelay=${delayMs}|${delayMs}" "${delayed}"`,
+          { stdio: 'inherit' }
+        )
+
+        delayedAudioPaths.push(delayed)
+        audioClipIdx++
+        console.log(`Processed audio clip ${audioClipIdx}`)
+      }
+    }
+
+    let audioPath
+    if (delayedAudioPaths.length === 0) {
+      audioPath = `${TMP}/audio_silent.aac`
+      execSync(
+        `ffmpeg -y -f lavfi -i anullsrc=r=44100:cl=stereo -t ${tfj.duration} -c:a aac "${audioPath}"`,
+        { stdio: 'inherit' }
+      )
+    } else {
+      const inputs = delayedAudioPaths.map((p) => `-i "${p}"`).join(' ')
+      audioPath = `${TMP}/audio_mixed.aac`
+      execSync(
+        `ffmpeg -y ${inputs} ` +
+        `-filter_complex "amix=inputs=${delayedAudioPaths.length}:normalize=0:duration=longest" ` +
+        `"${audioPath}"`,
+        { stdio: 'inherit' }
+      )
+    }
     // CONCAT + MUX + UPLOAD — Task 5
 
   } else {
