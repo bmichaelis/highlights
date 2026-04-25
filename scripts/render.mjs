@@ -184,7 +184,71 @@ try {
         { stdio: 'inherit' }
       )
     }
-    // CONCAT + MUX + UPLOAD — Task 5
+    // Concat video segments with per-clip xfade transitions
+    let videoPath
+    if (segPaths.length === 1) {
+      videoPath = segPaths[0]
+    } else {
+      const inputs = segPaths.map((p) => `-i "${p}"`).join(' ')
+      let prevLabel = '[0:v]'
+      const filterParts = []
+      let accumulatedOffset = 0
+      for (let i = 1; i < videoClips.length; i++) {
+        const fadeDur = videoClips[i].transition.duration
+        accumulatedOffset += (videoClips[i - 1].end - videoClips[i - 1].start) - fadeDur
+        const outLabel = i < videoClips.length - 1 ? `[v${i}]` : '[vout]'
+        filterParts.push(
+          `${prevLabel}[${i}:v]xfade=transition=fade:duration=${fadeDur}:offset=${accumulatedOffset.toFixed(3)}${outLabel}`
+        )
+        prevLabel = outLabel
+      }
+      videoPath = `${TMP}/video_only.mp4`
+      execSync(
+        `ffmpeg -y ${inputs} -filter_complex "${filterParts.join(';')}" -map "[vout]" -c:v libx264 -preset fast -crf 22 "${videoPath}"`,
+        { stdio: 'inherit' }
+      )
+    }
+
+    // Mux video + audio
+    const outputPath = `${TMP}/output.mp4`
+    execSync(
+      `ffmpeg -y -i "${videoPath}" -i "${audioPath}" -c:v copy -c:a aac -shortest "${outputPath}"`,
+      { stdio: 'inherit' }
+    )
+
+    // Upload to Drive via resumable upload
+    const fileSize = fs.statSync(outputPath).size
+    const initRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Upload-Content-Type': 'video/mp4',
+          'X-Upload-Content-Length': String(fileSize),
+        },
+        body: JSON.stringify({
+          name: `highlights_${new Date().toISOString().slice(0, 10)}.mp4`,
+          parents: [folderId],
+          mimeType: 'video/mp4',
+        }),
+      }
+    )
+    if (!initRes.ok) throw new Error(`Upload init failed: ${await initRes.text()}`)
+    const uploadUrl = initRes.headers.get('location')
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(fileSize) },
+      body: Readable.toWeb(fs.createReadStream(outputPath)),
+      duplex: 'half',
+    })
+    if (!uploadRes.ok) throw new Error(`Upload failed: ${await uploadRes.text()}`)
+    const { id: driveFileId } = await uploadRes.json()
+
+    await postCallback('complete', { driveFileId })
+    console.log('Render complete, Drive file ID:', driveFileId)
 
   } else {
     // ── LEGACY PATH (unchanged) ───────────────────────────────────────────────
