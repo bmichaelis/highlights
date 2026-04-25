@@ -194,7 +194,7 @@ try {
       const filterParts = []
       let accumulatedOffset = 0
       for (let i = 1; i < videoClips.length; i++) {
-        const fadeDur = videoClips[i].transition.duration
+        const fadeDur = videoClips[i].transition?.duration ?? 0.5
         accumulatedOffset += (videoClips[i - 1].end - videoClips[i - 1].start) - fadeDur
         const outLabel = i < videoClips.length - 1 ? `[v${i}]` : '[vout]'
         filterParts.push(
