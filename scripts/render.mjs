@@ -145,10 +145,12 @@ try {
           { stdio: 'inherit' }
         )
 
-        const fadeOutSt = clipDur - clip.fade.out
+        const fadeIn  = Math.max(0.001, clip.fade?.in  ?? 0.2)
+        const fadeOut = Math.max(0.001, clip.fade?.out ?? 0.2)
+        const fadeOutSt = Math.max(0, clipDur - fadeOut)
         execSync(
           `ffmpeg -y -i "${trimmed}" ` +
-          `-af "afade=t=in:st=0:d=${clip.fade.in},afade=t=out:st=${fadeOutSt.toFixed(3)}:d=${clip.fade.out}" ` +
+          `-af "afade=t=in:st=0:d=${fadeIn},afade=t=out:st=${fadeOutSt.toFixed(3)}:d=${fadeOut}" ` +
           `"${faded}"`,
           { stdio: 'inherit' }
         )
