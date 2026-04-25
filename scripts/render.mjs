@@ -54,6 +54,7 @@ try {
     const v1Track = tfj.tracks.find((t) => t.id === 'V1')
     const audioTracks = tfj.tracks.filter((t) => t.kind === 'audio' && !t.muted)
     const videoClips = v1Track?.clips ?? []
+    if (videoClips.length === 0) throw new Error('timelineJson V1 track is empty or missing')
 
     // Collect unique source Drive file IDs
     const imageSources = new Map()  // Drive file ID → local path
