@@ -18,6 +18,7 @@ export type Clip = {
   thumbnailUrl?: string // images only
   start: number         // seconds from t=0
   duration: number      // seconds
+  sourceIn?: number     // seconds into source file where playback begins; undefined = 0
   fadeIn?: number       // seconds; undefined treated as 0.2
   fadeOut?: number      // seconds; undefined treated as 0.2
   kenBurns?: { from: KBPosition; to: KBPosition; scale: number } | null

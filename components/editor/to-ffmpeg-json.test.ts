@@ -149,4 +149,28 @@ describe('toFFmpegJson', () => {
     const vTrack = result.tracks.find((t) => t.id === 'V1')!
     expect((vTrack.clips[0] as { kenburns: unknown }).kenburns).toBeNull()
   })
+
+  it('uses sourceIn for in/out when set', () => {
+    const tl: Timeline = {
+      ...timeline,
+      tracks: [
+        {
+          ...timeline.tracks[0],
+          clips: [{ ...timeline.tracks[0].clips[0], sourceIn: 1.5 }, timeline.tracks[0].clips[1]],
+        },
+        timeline.tracks[1],
+      ],
+    }
+    const result = toFFmpegJson(tl, 'test')
+    const vTrack = result.tracks.find((t) => t.id === 'V1')!
+    // in/out are source offsets (1.5 → 4.5); start/end remain timeline positions (0 → 3)
+    expect(vTrack.clips[0]).toMatchObject({ in: 1.5, out: 4.5, start: 0, end: 3 })
+  })
+
+  it('defaults sourceIn to 0 for clips without it even when start != 0', () => {
+    const result = toFFmpegJson(timeline, 'test')
+    const vTrack = result.tracks.find((t) => t.id === 'V1')!
+    // c2: start=3, duration=4, no sourceIn → in=0 out=4 (NOT in=3 out=7)
+    expect(vTrack.clips[1]).toMatchObject({ in: 0, out: 4, start: 3, end: 7 })
+  })
 })
