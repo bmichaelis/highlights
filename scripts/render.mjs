@@ -2,6 +2,18 @@ import { execSync } from 'child_process'
 import { Readable } from 'stream'
 import fs from 'fs'
 
+const KB_COORDS = {
+  'top-left':     { x: 0,   y: 0   },
+  'top':          { x: 0.5, y: 0   },
+  'top-right':    { x: 1,   y: 0   },
+  'left':         { x: 0,   y: 0.5 },
+  'center':       { x: 0.5, y: 0.5 },
+  'right':        { x: 1,   y: 0.5 },
+  'bottom-left':  { x: 0,   y: 1   },
+  'bottom':       { x: 0.5, y: 1   },
+  'bottom-right': { x: 1,   y: 1   },
+}
+
 const payload = JSON.parse(process.env.RENDER_PAYLOAD)
 const { playlist, audioFileIds, accessToken, folderId, jobId,
         callbackUrl, callbackSecret, timelineJson } = payload
@@ -82,7 +94,41 @@ try {
       console.log(`Downloaded audio source: ${sourceId}`)
     }
 
-    // VIDEO SEGMENTS — Task 3
+    // Build per-clip video segments
+    const segPaths = []
+    for (let i = 0; i < videoClips.length; i++) {
+      const clip = videoClips[i]
+      const src = imageSources.get(clip.source)
+      const seg = `${TMP}/seg_${i}.mp4`
+      const duration = clip.end - clip.start
+
+      let vf
+      if (clip.kenburns !== null) {
+        const kb = clip.kenburns
+        const D = Math.round(duration * 30)
+        const from = KB_COORDS[kb.from]
+        const to = KB_COORDS[kb.to]
+        vf = [
+          `zoompan=z='1+(${kb.scale}-1)*on/${D}':` +
+          `x='max(0,min(iw*(zoom-1),iw*((${from.x}+(${to.x}-${from.x})*on/${D})*zoom-0.5)))':` +
+          `y='max(0,min(ih*(zoom-1),ih*((${from.y}+(${to.y}-${from.y})*on/${D})*zoom-0.5)))':` +
+          `d=${D}:s=1920x1080:fps=30`,
+          'scale=1920:1080',
+          'format=yuv420p',
+        ].join(',')
+      } else {
+        vf = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,fps=30,format=yuv420p'
+      }
+
+      execSync(
+        `ffmpeg -y -loop 1 -t ${duration} -i "${src}" ` +
+        `-vf "${vf}" ` +
+        `-c:v libx264 -preset fast -crf 22 "${seg}"`,
+        { stdio: 'inherit' }
+      )
+      segPaths.push(seg)
+      console.log(`Rendered video segment ${i + 1}/${videoClips.length}`)
+    }
     // AUDIO PROCESSING — Task 4
     // CONCAT + MUX + UPLOAD — Task 5
 
