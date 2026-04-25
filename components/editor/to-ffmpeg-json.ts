@@ -29,7 +29,8 @@ function clipEnd(clip: Clip): number {
 }
 
 function serializeClip(clip: Clip, kind: 'video' | 'audio'): FFmpegClip {
-  const base = { id: clip.id, source: clip.mediaId, in: clip.start, out: clipEnd(clip), start: clip.start, end: clipEnd(clip) }
+  const sourceIn = clip.sourceIn ?? 0
+  const base = { id: clip.id, source: clip.mediaId, in: sourceIn, out: sourceIn + clip.duration, start: clip.start, end: clip.start + clip.duration }
   if (kind === 'video') {
     return {
       ...base,
