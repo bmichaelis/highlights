@@ -71,6 +71,22 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
   const apiBase = `/api/orgs/${orgSlug}/teams/${teamId}/projects/${projectId}`
   const audioBase = `${apiBase}/audio`
 
+  const audioDurationCache = useRef<Map<string, Promise<number | null>>>(new Map())
+
+  const probeAudioDuration = useCallback((mediaId: string): Promise<number | null> => {
+    const cached = audioDurationCache.current.get(mediaId)
+    if (cached) return cached
+    const p = new Promise<number | null>((resolve) => {
+      const a = new Audio()
+      a.preload = 'metadata'
+      a.onloadedmetadata = () => resolve(isFinite(a.duration) ? a.duration : null)
+      a.onerror = () => resolve(null)
+      a.src = `${audioBase}/${mediaId}`
+    })
+    audioDurationCache.current.set(mediaId, p)
+    return p
+  }, [audioBase])
+
   // Stable ref for values needed by keyboard handler (avoids stale closures in useEffect([]))
   const editorStateRef = useRef({ timeline, playhead, snapOn })
   useEffect(() => { editorStateRef.current = { timeline, playhead, snapOn } })
@@ -183,19 +199,28 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     setDrag((d) => d ? { ...d, overTrackId: trackId, overTime: time } : null)
   }, [])
 
-  const handleDrop = useCallback((trackId: string, time: number) => {
+  const handleDrop = useCallback(async (trackId: string, time: number) => {
     if (!drag) return
+    const media = drag.media
+    setDrag(null)
     const newClip: Clip = {
       id: `c-${crypto.randomUUID()}`,
-      mediaId: drag.media.id,
-      filename: drag.media.filename,
-      thumbnailUrl: drag.media.thumbnailUrl,
+      mediaId: media.id,
+      filename: media.filename,
+      thumbnailUrl: media.thumbnailUrl,
       start: time,
-      duration: drag.media.defaultDuration,
+      duration: media.defaultDuration,
+    }
+    if (media.kind === 'audio') {
+      const dur = await probeAudioDuration(media.id)
+      if (dur === null) {
+        console.warn('Audio duration probe failed for', media.id)
+      } else {
+        newClip.sourceDuration = dur
+      }
     }
     dispatch({ type: 'ADD_CLIP', trackId, clip: newClip })
-    setDrag(null)
-  }, [drag])
+  }, [drag, probeAudioDuration])
 
   const handleUpdateClip = useCallback((trackId: string, clipId: string, patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>>) => {
     dispatch({ type: 'UPDATE_CLIP', trackId, clipId, patch })
