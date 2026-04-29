@@ -66,6 +66,26 @@ describe('editorReducer', () => {
     expect(next.present.tracks[0].clips[0].duration).toBe(0.3)
   })
 
+  it('RESIZE_CLIP clamps to sourceDuration - sourceIn when sourceDuration is set', () => {
+    const audioClip: Clip = {
+      id: 'a1', mediaId: 'song-id', filename: 'song.mp3',
+      start: 0, duration: 10, sourceIn: 5, sourceDuration: 60,
+    }
+    const tl: Timeline = { ...emptyTimeline, tracks: [emptyTimeline.tracks[0], { ...emptyTimeline.tracks[1], clips: [audioClip] }] }
+    const next = editorReducer(makeHistory(tl), { type: 'RESIZE_CLIP', trackId: 'A1', clipId: 'a1', newDuration: 999 })
+    // sourceIn=5, sourceDuration=60 → max duration = 55
+    expect(next.present.tracks[1].clips[0].duration).toBe(55)
+  })
+
+  it('RESIZE_CLIP without sourceDuration only enforces 0.3 minimum', () => {
+    const tl: Timeline = {
+      ...emptyTimeline,
+      tracks: [{ ...emptyTimeline.tracks[0], clips: [clip] }, emptyTimeline.tracks[1]],
+    }
+    const next = editorReducer(makeHistory(tl), { type: 'RESIZE_CLIP', trackId: 'V1', clipId: 'c1', newDuration: 99 })
+    expect(next.present.tracks[0].clips[0].duration).toBe(99)
+  })
+
   it('history is capped at 40 past states', () => {
     let state = makeHistory(emptyTimeline)
     for (let i = 0; i < 45; i++) {
