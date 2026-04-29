@@ -286,6 +286,8 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
           timeline={timeline}
           selectedClipId={selectedClipId}
           onUpdateClip={handleUpdateClip}
+          onTrimLeft={(tid, cid, newSourceIn) => dispatch({ type: 'TRIM_LEFT', trackId: tid, clipId: cid, newSourceIn })}
+          onResizeClip={(tid, cid, dur) => dispatch({ type: 'RESIZE_CLIP', trackId: tid, clipId: cid, newDuration: dur })}
         />
       </div>
 
