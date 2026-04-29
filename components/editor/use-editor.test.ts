@@ -66,6 +66,26 @@ describe('editorReducer', () => {
     expect(next.present.tracks[0].clips[0].duration).toBe(0.3)
   })
 
+  it('RESIZE_CLIP clamps to sourceDuration - sourceIn when sourceDuration is set', () => {
+    const audioClip: Clip = {
+      id: 'a1', mediaId: 'song-id', filename: 'song.mp3',
+      start: 0, duration: 10, sourceIn: 5, sourceDuration: 60,
+    }
+    const tl: Timeline = { ...emptyTimeline, tracks: [emptyTimeline.tracks[0], { ...emptyTimeline.tracks[1], clips: [audioClip] }] }
+    const next = editorReducer(makeHistory(tl), { type: 'RESIZE_CLIP', trackId: 'A1', clipId: 'a1', newDuration: 999 })
+    // sourceIn=5, sourceDuration=60 → max duration = 55
+    expect(next.present.tracks[1].clips[0].duration).toBe(55)
+  })
+
+  it('RESIZE_CLIP without sourceDuration only enforces 0.3 minimum', () => {
+    const tl: Timeline = {
+      ...emptyTimeline,
+      tracks: [{ ...emptyTimeline.tracks[0], clips: [clip] }, emptyTimeline.tracks[1]],
+    }
+    const next = editorReducer(makeHistory(tl), { type: 'RESIZE_CLIP', trackId: 'V1', clipId: 'c1', newDuration: 99 })
+    expect(next.present.tracks[0].clips[0].duration).toBe(99)
+  })
+
   it('history is capped at 40 past states', () => {
     let state = makeHistory(emptyTimeline)
     for (let i = 0; i < 45; i++) {
@@ -125,10 +145,87 @@ describe('editorReducer', () => {
       expect(next.present.tracks[0].clips[1].thumbnailUrl).toBe('https://thumb.url')
     })
 
+    it('right clip recomputes sourceIn for trimmed audio', () => {
+      const trimmed: Clip = {
+        id: 'a1', mediaId: 'song-id', filename: 'song.mp3',
+        start: 5, duration: 20, sourceIn: 10, sourceDuration: 60,
+      }
+      const tl: Timeline = {
+        ...emptyTimeline,
+        tracks: [emptyTimeline.tracks[0], { ...emptyTimeline.tracks[1], clips: [trimmed] }],
+      }
+      // Split at timeline t=12 — that's 7s into the clip → source position 17
+      const next = editorReducer(makeHistory(tl), { type: 'SPLIT_CLIP', trackId: 'A1', clipId: 'a1', at: 12 })
+      const clips = next.present.tracks[1].clips
+      expect(clips).toHaveLength(2)
+      expect(clips[0]).toMatchObject({ start: 5, duration: 7, sourceIn: 10 })
+      expect(clips[1]).toMatchObject({ start: 12, duration: 13, sourceIn: 17 })
+    })
+
     it('is a no-op when at equals clip start', () => {
       const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 0 })
       expect(next.present.tracks[0].clips).toHaveLength(1)
       expect(next.past).toHaveLength(0)
+    })
+  })
+
+  describe('TRIM_LEFT', () => {
+    const audioClip: Clip = {
+      id: 'a1', mediaId: 'song-id', filename: 'song.mp3',
+      start: 5, duration: 10, sourceIn: 0, sourceDuration: 60,
+    }
+    const withClip: Timeline = {
+      ...emptyTimeline,
+      tracks: [emptyTimeline.tracks[0], { ...emptyTimeline.tracks[1], clips: [audioClip] }],
+    }
+
+    it('shifts start and shrinks duration by the same delta as sourceIn', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'TRIM_LEFT', trackId: 'A1', clipId: 'a1', newSourceIn: 3 })
+      const c = next.present.tracks[1].clips[0]
+      expect(c.sourceIn).toBe(3)
+      expect(c.start).toBe(8)
+      expect(c.duration).toBe(7)
+      // right edge on timeline (start + duration) stays at 15
+      expect(c.start + c.duration).toBe(15)
+    })
+
+    it('clamps newSourceIn to [0, sourceDuration - 0.3] when sourceDuration is known', () => {
+      const high = editorReducer(makeHistory(withClip), { type: 'TRIM_LEFT', trackId: 'A1', clipId: 'a1', newSourceIn: 999 })
+      expect(high.present.tracks[1].clips[0].sourceIn).toBe(59.7)
+
+      const low = editorReducer(makeHistory(withClip), { type: 'TRIM_LEFT', trackId: 'A1', clipId: 'a1', newSourceIn: -5 })
+      expect(low.present.tracks[1].clips[0].sourceIn).toBe(0)
+    })
+
+    it('clamps newSourceIn to >= 0 only when sourceDuration is undefined', () => {
+      const noDur: Clip = { ...audioClip, sourceDuration: undefined }
+      const tl: Timeline = { ...emptyTimeline, tracks: [emptyTimeline.tracks[0], { ...emptyTimeline.tracks[1], clips: [noDur] }] }
+      const next = editorReducer(makeHistory(tl), { type: 'TRIM_LEFT', trackId: 'A1', clipId: 'a1', newSourceIn: 999 })
+      expect(next.present.tracks[1].clips[0].sourceIn).toBe(999)
+    })
+
+    it('treats undefined sourceIn as 0 when computing delta', () => {
+      const noIn: Clip = { ...audioClip, sourceIn: undefined }
+      const tl: Timeline = { ...emptyTimeline, tracks: [emptyTimeline.tracks[0], { ...emptyTimeline.tracks[1], clips: [noIn] }] }
+      const next = editorReducer(makeHistory(tl), { type: 'TRIM_LEFT', trackId: 'A1', clipId: 'a1', newSourceIn: 2 })
+      const c = next.present.tracks[1].clips[0]
+      expect(c.sourceIn).toBe(2)
+      expect(c.start).toBe(7)
+      expect(c.duration).toBe(8)
+    })
+
+    it('pushes to undo history', () => {
+      const next = editorReducer(makeHistory(withClip), { type: 'TRIM_LEFT', trackId: 'A1', clipId: 'a1', newSourceIn: 3 })
+      expect(next.past).toHaveLength(1)
+    })
+
+    it('UNDO restores original sourceIn/start/duration', () => {
+      const after = editorReducer(makeHistory(withClip), { type: 'TRIM_LEFT', trackId: 'A1', clipId: 'a1', newSourceIn: 3 })
+      const undone = editorReducer(after, { type: 'UNDO' })
+      const c = undone.present.tracks[1].clips[0]
+      expect(c.sourceIn).toBe(0)
+      expect(c.start).toBe(5)
+      expect(c.duration).toBe(10)
     })
   })
 

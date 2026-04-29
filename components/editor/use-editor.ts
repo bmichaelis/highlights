@@ -55,7 +55,32 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
       const next: Timeline = {
         ...state.present,
         tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
-          normalizeTrack(clips.map((c) => c.id === action.clipId ? { ...c, duration: Math.max(0.3, action.newDuration) } : c))
+          normalizeTrack(clips.map((c) => {
+            if (c.id !== action.clipId) return c
+            const maxDur = c.sourceDuration !== undefined
+              ? c.sourceDuration - (c.sourceIn ?? 0)
+              : Infinity
+            const newDuration = Math.max(0.3, Math.min(maxDur, action.newDuration))
+            return { ...c, duration: newDuration }
+          }))
+        ),
+      }
+      return pushHistory(state, next)
+    }
+    case 'TRIM_LEFT': {
+      const next: Timeline = {
+        ...state.present,
+        tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
+          clips.map((c) => {
+            if (c.id !== action.clipId) return c
+            const origIn = c.sourceIn ?? 0
+            const maxIn = c.sourceDuration !== undefined
+              ? Math.max(0, c.sourceDuration - 0.3)
+              : Infinity
+            const newIn = Math.max(0, Math.min(maxIn, action.newSourceIn))
+            const delta = newIn - origIn
+            return { ...c, sourceIn: newIn, start: c.start + delta, duration: c.duration - delta }
+          })
         ),
       }
       return pushHistory(state, next)
@@ -70,6 +95,7 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
         id: crypto.randomUUID(),
         start: action.at,
         duration: (clip.start + clip.duration) - action.at,
+        sourceIn: (clip.sourceIn ?? 0) + (action.at - clip.start),
         fadeIn: 0,
       }
       const next: Timeline = {

@@ -14,6 +14,7 @@ type Props = {
   onZoomChange: (zoom: number) => void
   onMoveClip: (trackId: string, clipId: string, newStart: number) => void
   onResizeClip: (trackId: string, clipId: string, newDuration: number) => void
+  onTrimLeftClip: (trackId: string, clipId: string, newSourceIn: number) => void
   onRemoveClip: (trackId: string, clipId: string) => void
   onSelectClip: (clipId: string | null) => void
   onToggleMute: (trackId: string) => void
@@ -53,9 +54,10 @@ type ClipViewProps = {
   onSelect: () => void
   onMoveStart: (e: React.MouseEvent, clip: Clip) => void
   onResizeStart: (e: React.MouseEvent, clip: Clip) => void
+  onTrimLeftStart?: (e: React.MouseEvent, clip: Clip) => void
 }
 
-function ClipView({ clip, track, selected, pixelsPerSecond, onSelect, onMoveStart, onResizeStart }: ClipViewProps) {
+function ClipView({ clip, track, selected, pixelsPerSecond, onSelect, onMoveStart, onResizeStart, onTrimLeftStart }: ClipViewProps) {
   const bg = track.kind === 'audio' ? 'var(--track-a)' : 'var(--track-v)'
   const left = clip.start * pixelsPerSecond
   const width = Math.max(clip.duration * pixelsPerSecond, 24)
@@ -83,7 +85,17 @@ function ClipView({ clip, track, selected, pixelsPerSecond, onSelect, onMoveStar
       }}>
         {clip.filename} · {clip.duration.toFixed(1)}s
       </span>
-      {/* Resize handle */}
+      {/* Left-edge trim handle (audio only) */}
+      {onTrimLeftStart && (
+        <div
+          onMouseDown={(e) => { e.stopPropagation(); onTrimLeftStart(e, clip) }}
+          style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: 6,
+            cursor: 'ew-resize', background: 'rgba(0,0,0,.15)',
+          }}
+        />
+      )}
+      {/* Right-edge resize handle */}
       <div
         onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, clip) }}
         style={{
@@ -97,7 +109,7 @@ function ClipView({ clip, track, selected, pixelsPerSecond, onSelect, onMoveStar
 
 export function Timeline({
   timeline, playhead, zoom, selectedClipId, snapOn, drag, totalDuration,
-  onSeekRuler, onZoomChange, onMoveClip, onResizeClip, onRemoveClip,
+  onSeekRuler, onZoomChange, onMoveClip, onResizeClip, onTrimLeftClip, onRemoveClip,
   onSelectClip, onToggleMute, onToggleLock, onDragOver, onDrop,
   onAddAudioTrack, onRemoveAudioTrack,
 }: Props) {
@@ -156,6 +168,34 @@ export function Timeline({
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
   }, [pixelsPerSecond, onResizeClip])
+
+  const startClipTrimLeft = useCallback((e: React.MouseEvent, clip: Clip, track: Track) => {
+    if (track.locked) return
+    e.preventDefault()
+    const origSourceIn = clip.sourceIn ?? 0
+    const origStart = clip.start
+    const origX = e.clientX
+    const otherClips = track.clips.filter((c) => c.id !== clip.id)
+    const maxSourceIn = clip.sourceDuration !== undefined
+      ? Math.max(0, clip.sourceDuration - 0.3)
+      : Infinity
+
+    function onMove(ev: MouseEvent) {
+      const dx = ev.clientX - origX
+      const dt = dx / pixelsPerSecond
+      const rawStart = Math.max(0, origStart + dt)
+      const snapped = snapTime(rawStart, otherClips, snapOn, pixelsPerSecond)
+      const delta = snapped - origStart
+      const newIn = Math.max(0, Math.min(maxSourceIn, origSourceIn + delta))
+      onTrimLeftClip(track.id, clip.id, newIn)
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [pixelsPerSecond, snapOn, onTrimLeftClip])
 
   // Keyboard: delete selected clip
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -322,6 +362,7 @@ export function Timeline({
                     onSelect={() => onSelectClip(clip.id)}
                     onMoveStart={(e) => startClipMove(e, clip, track)}
                     onResizeStart={(e) => startClipResize(e, clip, track)}
+                    onTrimLeftStart={track.kind === 'audio' ? (e) => startClipTrimLeft(e, clip, track) : undefined}
                   />
                 ))}
 
