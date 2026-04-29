@@ -3,6 +3,32 @@ import type { CSSProperties } from 'react'
 import type { Timeline, Clip, KBPosition } from './types'
 import { DEFAULT_KB } from './types'
 
+export function formatMMSS(s: number): string {
+  const safe = Math.max(0, s)
+  const m = Math.floor(safe / 60)
+  const sec = (safe - m * 60).toFixed(1)
+  return `${m}:${sec.padStart(4, '0')}`
+}
+
+export function parseMMSS(input: string): number | null {
+  const trimmed = input.trim()
+  if (trimmed === '') return null
+  if (trimmed.startsWith('-')) return null
+  const colonIdx = trimmed.indexOf(':')
+  if (colonIdx === -1) {
+    const n = Number(trimmed)
+    return Number.isFinite(n) && n >= 0 ? n : null
+  }
+  const mStr = trimmed.slice(0, colonIdx)
+  const sStr = trimmed.slice(colonIdx + 1)
+  if (mStr === '' || sStr === '') return null
+  const m = Number(mStr)
+  const s = Number(sStr)
+  if (!Number.isFinite(m) || !Number.isFinite(s)) return null
+  if (m < 0 || s < 0 || s >= 60) return null
+  return m * 60 + s
+}
+
 type Props = {
   timeline: Timeline
   selectedClipId: string | null
