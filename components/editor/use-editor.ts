@@ -55,7 +55,14 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
       const next: Timeline = {
         ...state.present,
         tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
-          normalizeTrack(clips.map((c) => c.id === action.clipId ? { ...c, duration: Math.max(0.3, action.newDuration) } : c))
+          normalizeTrack(clips.map((c) => {
+            if (c.id !== action.clipId) return c
+            const maxDur = c.sourceDuration !== undefined
+              ? c.sourceDuration - (c.sourceIn ?? 0)
+              : Infinity
+            const newDuration = Math.max(0.3, Math.min(maxDur, action.newDuration))
+            return { ...c, duration: newDuration }
+          }))
         ),
       }
       return pushHistory(state, next)
