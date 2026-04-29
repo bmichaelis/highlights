@@ -145,6 +145,23 @@ describe('editorReducer', () => {
       expect(next.present.tracks[0].clips[1].thumbnailUrl).toBe('https://thumb.url')
     })
 
+    it('right clip recomputes sourceIn for trimmed audio', () => {
+      const trimmed: Clip = {
+        id: 'a1', mediaId: 'song-id', filename: 'song.mp3',
+        start: 5, duration: 20, sourceIn: 10, sourceDuration: 60,
+      }
+      const tl: Timeline = {
+        ...emptyTimeline,
+        tracks: [emptyTimeline.tracks[0], { ...emptyTimeline.tracks[1], clips: [trimmed] }],
+      }
+      // Split at timeline t=12 — that's 7s into the clip → source position 17
+      const next = editorReducer(makeHistory(tl), { type: 'SPLIT_CLIP', trackId: 'A1', clipId: 'a1', at: 12 })
+      const clips = next.present.tracks[1].clips
+      expect(clips).toHaveLength(2)
+      expect(clips[0]).toMatchObject({ start: 5, duration: 7, sourceIn: 10 })
+      expect(clips[1]).toMatchObject({ start: 12, duration: 13, sourceIn: 17 })
+    })
+
     it('is a no-op when at equals clip start', () => {
       const next = editorReducer(makeHistory(withClip), { type: 'SPLIT_CLIP', trackId: 'V1', clipId: 'c1', at: 0 })
       expect(next.present.tracks[0].clips).toHaveLength(1)
