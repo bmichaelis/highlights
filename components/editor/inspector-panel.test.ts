@@ -18,6 +18,11 @@ describe('formatMMSS', () => {
   it('formats values over an hour without rolling over to hours', () => {
     expect(formatMMSS(3661)).toBe('61:01.0')
   })
+
+  it('rolls over to the next minute instead of producing "0:60.0"', () => {
+    expect(formatMMSS(59.95)).toBe('1:00.0')
+    expect(formatMMSS(119.96)).toBe('2:00.0')
+  })
 })
 
 describe('parseMMSS', () => {

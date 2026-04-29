@@ -5,8 +5,10 @@ import { DEFAULT_KB } from './types'
 
 export function formatMMSS(s: number): string {
   const safe = Math.max(0, s)
-  const m = Math.floor(safe / 60)
-  const sec = (safe - m * 60).toFixed(1)
+  // Round to one decimal first so 59.95 doesn't render as "0:60.0".
+  const tenths = Math.round(safe * 10) / 10
+  const m = Math.floor(tenths / 60)
+  const sec = (tenths - m * 60).toFixed(1)
   return `${m}:${sec.padStart(4, '0')}`
 }
 
