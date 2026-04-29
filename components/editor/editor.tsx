@@ -328,6 +328,7 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
         onZoomChange={setZoom}
         onMoveClip={(tid, cid, start) => dispatch({ type: 'MOVE_CLIP', trackId: tid, clipId: cid, newStart: start })}
         onResizeClip={(tid, cid, dur) => dispatch({ type: 'RESIZE_CLIP', trackId: tid, clipId: cid, newDuration: dur })}
+        onTrimLeftClip={(tid, cid, newSourceIn) => dispatch({ type: 'TRIM_LEFT', trackId: tid, clipId: cid, newSourceIn })}
         onRemoveClip={(tid, cid) => dispatch({ type: 'REMOVE_CLIP', trackId: tid, clipId: cid })}
         onSelectClip={setSelectedClipId}
         onToggleMute={(tid) => dispatch({ type: 'TOGGLE_MUTE', trackId: tid })}
