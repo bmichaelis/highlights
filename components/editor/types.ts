@@ -19,6 +19,7 @@ export type Clip = {
   start: number         // seconds from t=0
   duration: number      // seconds
   sourceIn?: number     // seconds into source file where playback begins; undefined = 0
+  sourceDuration?: number  // seconds; full length of source audio file. undefined = unknown (no clamp)
   fadeIn?: number       // seconds; undefined treated as 0.2
   fadeOut?: number      // seconds; undefined treated as 0.2
   kenBurns?: { from: KBPosition; to: KBPosition; scale: number } | null
@@ -69,6 +70,7 @@ export type EditorAction =
   | { type: 'REMOVE_CLIP'; trackId: string; clipId: string }
   | { type: 'MOVE_CLIP'; trackId: string; clipId: string; newStart: number }
   | { type: 'RESIZE_CLIP'; trackId: string; clipId: string; newDuration: number }
+  | { type: 'TRIM_LEFT'; trackId: string; clipId: string; newSourceIn: number }
   | { type: 'SPLIT_CLIP'; trackId: string; clipId: string; at: number }
   | { type: 'UPDATE_CLIP'; trackId: string; clipId: string; patch: Partial<Pick<Clip, 'fadeIn' | 'fadeOut' | 'kenBurns'>> }
   | { type: 'TOGGLE_MUTE'; trackId: string }
