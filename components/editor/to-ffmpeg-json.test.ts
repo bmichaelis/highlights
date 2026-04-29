@@ -173,4 +173,21 @@ describe('toFFmpegJson', () => {
     // c2: start=3, duration=4, no sourceIn → in=0 out=4 (NOT in=3 out=7)
     expect(vTrack.clips[1]).toMatchObject({ in: 0, out: 4, start: 3, end: 7 })
   })
+
+  it('serializes trimmed audio clip with sourceIn-based in/out', () => {
+    const tl: Timeline = {
+      ...timeline,
+      tracks: [
+        timeline.tracks[0],
+        {
+          ...timeline.tracks[1],
+          clips: [{ ...timeline.tracks[1].clips[0], sourceIn: 8, duration: 12 }],
+        },
+      ],
+    }
+    const result = toFFmpegJson(tl, 'test')
+    const aTrack = result.tracks.find((t) => t.id === 'A1')!
+    // sourceIn=8, duration=12 → in=8, out=20; start/end are timeline positions
+    expect(aTrack.clips[0]).toMatchObject({ type: 'audio', source: 'drive-mus', in: 8, out: 20, start: 0, end: 12 })
+  })
 })
