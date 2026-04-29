@@ -60,6 +60,24 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
       }
       return pushHistory(state, next)
     }
+    case 'TRIM_LEFT': {
+      const next: Timeline = {
+        ...state.present,
+        tracks: updateTrack(state.present.tracks, action.trackId, (clips) =>
+          clips.map((c) => {
+            if (c.id !== action.clipId) return c
+            const origIn = c.sourceIn ?? 0
+            const maxIn = c.sourceDuration !== undefined
+              ? Math.max(0, c.sourceDuration - 0.3)
+              : Infinity
+            const newIn = Math.max(0, Math.min(maxIn, action.newSourceIn))
+            const delta = newIn - origIn
+            return { ...c, sourceIn: newIn, start: c.start + delta, duration: c.duration - delta }
+          })
+        ),
+      }
+      return pushHistory(state, next)
+    }
     case 'SPLIT_CLIP': {
       const track = state.present.tracks.find((t) => t.id === action.trackId)
       const clip = track?.clips.find((c) => c.id === action.clipId)
