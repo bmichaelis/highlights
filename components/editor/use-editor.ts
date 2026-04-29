@@ -95,6 +95,7 @@ export function editorReducer(state: HistoryState, action: EditorAction): Histor
         id: crypto.randomUUID(),
         start: action.at,
         duration: (clip.start + clip.duration) - action.at,
+        sourceIn: (clip.sourceIn ?? 0) + (action.at - clip.start),
         fadeIn: 0,
       }
       const next: Timeline = {
