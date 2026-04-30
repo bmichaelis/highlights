@@ -5,6 +5,8 @@ import { organizations, teams, projects, driveConnections } from '@/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { refreshDriveToken } from '@/lib/drive/auth'
 
+const TOKEN_REFRESH_BUFFER_MS = 60_000
+
 type Params = { params: Promise<{ orgSlug: string; teamId: string; projectId: string; fileId: string }> }
 
 export async function GET(req: Request, { params }: Params) {
@@ -25,17 +27,22 @@ export async function GET(req: Request, { params }: Params) {
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
   try {
-    const tokenData = await refreshDriveToken(conn.refreshToken)
-    await db.update(driveConnections)
-      .set({ accessToken: tokenData.accessToken, expiresAt: new Date(tokenData.expiresAt) })
-      .where(eq(driveConnections.id, conn.id))
+    let accessToken = conn.accessToken
+    const expiresAtMs = conn.expiresAt ? conn.expiresAt.getTime() : 0
+    if (!accessToken || expiresAtMs < Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+      const tokenData = await refreshDriveToken(conn.refreshToken)
+      accessToken = tokenData.accessToken
+      await db.update(driveConnections)
+        .set({ accessToken, expiresAt: new Date(tokenData.expiresAt) })
+        .where(eq(driveConnections.id, conn.id))
+    }
 
     const range = req.headers.get('range')
     const driveRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
       {
         headers: {
-          Authorization: `Bearer ${tokenData.accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           ...(range ? { Range: range } : {}),
         },
       }
@@ -46,6 +53,7 @@ export async function GET(req: Request, { params }: Params) {
 
     const headers: Record<string, string> = {
       'Content-Type': driveRes.headers.get('content-type') ?? 'audio/mpeg',
+      'Cache-Control': 'private, max-age=3600',
     }
     const contentRange = driveRes.headers.get('content-range')
     if (contentRange) headers['Content-Range'] = contentRange
