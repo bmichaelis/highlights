@@ -1,6 +1,28 @@
 'use client'
-import { useRef, useCallback, useEffect } from 'react'
+import { memo, useRef, useCallback, useEffect } from 'react'
 import type { Timeline, Clip } from './types'
+
+// Memoized audio element with a stable ref callback. Inlining the ref
+// function in the parent's .map() loop creates a fresh function reference
+// every render, which React treats as a new ref — calling the old ref with
+// null (which pauses the audio) and then the new ref with the element. With
+// the play loop firing every animation frame, audio gets paused 60×/sec
+// and never sustains playback.
+const AudioTrackElement = memo(function AudioTrackElement({
+  trackId,
+  onMount,
+  onUnmount,
+}: {
+  trackId: string
+  onMount: (id: string, el: HTMLAudioElement) => void
+  onUnmount: (id: string) => void
+}) {
+  const refCallback = useCallback((el: HTMLAudioElement | null) => {
+    if (el) onMount(trackId, el)
+    else onUnmount(trackId)
+  }, [trackId, onMount, onUnmount])
+  return <audio style={{ display: 'none' }} ref={refCallback} />
+})
 
 type Props = {
   timeline: Timeline
@@ -32,6 +54,16 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map())
   const loadedClipIdRef = useRef<Map<string, string>>(new Map())
   const lastPlayAttemptRef = useRef<Map<string, number>>(new Map())
+
+  const registerAudio = useCallback((id: string, el: HTMLAudioElement) => {
+    audioRefs.current.set(id, el)
+  }, [])
+  const unregisterAudio = useCallback((id: string) => {
+    audioRefs.current.get(id)?.pause()
+    audioRefs.current.delete(id)
+    loadedClipIdRef.current.delete(id)
+    lastPlayAttemptRef.current.delete(id)
+  }, [])
 
   useEffect(() => {
     const audioTracks = timeline.tracks.filter((t) => t.kind === 'audio')
@@ -166,18 +198,11 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
         <span style={{ fontSize: 14, color: 'var(--ink-3)' }}>🔊</span>
       </div>
       {timeline.tracks.filter((t) => t.kind === 'audio').map((track) => (
-        <audio
+        <AudioTrackElement
           key={track.id}
-          style={{ display: 'none' }}
-          ref={(el) => {
-            if (el) {
-              audioRefs.current.set(track.id, el)
-            } else {
-              audioRefs.current.get(track.id)?.pause()
-              audioRefs.current.delete(track.id)
-              loadedClipIdRef.current.delete(track.id)
-            }
-          }}
+          trackId={track.id}
+          onMount={registerAudio}
+          onUnmount={unregisterAudio}
         />
       ))}
     </div>
