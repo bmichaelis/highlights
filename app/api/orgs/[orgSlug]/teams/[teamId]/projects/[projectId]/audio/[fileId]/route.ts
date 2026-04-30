@@ -9,7 +9,7 @@ const TOKEN_REFRESH_BUFFER_MS = 60_000
 
 type Params = { params: Promise<{ orgSlug: string; teamId: string; projectId: string; fileId: string }> }
 
-export async function GET(req: Request, { params }: Params) {
+export async function GET(_req: Request, { params }: Params) {
   const session = await requireSession()
   const { orgSlug, teamId, projectId, fileId } = await params
   const db = getDb()
@@ -37,38 +37,30 @@ export async function GET(req: Request, { params }: Params) {
         .where(eq(driveConnections.id, conn.id))
     }
 
-    const range = req.headers.get('range')
+    // Always fetch the full file from Drive — do NOT forward Range. The
+    // browser's <audio> element issues many tiny range requests during normal
+    // playback (and many more on every seek), each of which lands on the
+    // Worker and exhausts CPU. By serving the full file once with strong
+    // cache headers and no Accept-Ranges, the browser fetches the file once
+    // and serves all subsequent reads from its own cache.
     const driveRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          ...(range ? { Range: range } : {}),
-        },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     )
-    if (!driveRes.ok && driveRes.status !== 206) {
+    if (!driveRes.ok) {
       return NextResponse.json({ error: 'Drive fetch failed' }, { status: 502 })
     }
 
-    // Buffer the upstream body before returning. Streaming Response.body
-    // through the Worker leaves an in-flight upstream fetch when the browser
-    // cancels mid-stream (which it does on every audio seek), and the
-    // runtime kills the invocation with "code had hung". Buffering caps
-    // the work per request and keeps the response fully self-contained.
     const buffer = await driveRes.arrayBuffer()
 
-    const headers: Record<string, string> = {
-      'Content-Type': driveRes.headers.get('content-type') ?? 'audio/mpeg',
-      'Cache-Control': 'private, max-age=3600',
-      'Content-Length': String(buffer.byteLength),
-    }
-    const contentRange = driveRes.headers.get('content-range')
-    if (contentRange) headers['Content-Range'] = contentRange
-    const acceptRanges = driveRes.headers.get('accept-ranges')
-    if (acceptRanges) headers['Accept-Ranges'] = acceptRanges
-
-    return new Response(buffer, { status: driveRes.status, headers })
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': driveRes.headers.get('content-type') ?? 'audio/mpeg',
+        'Content-Length': String(buffer.byteLength),
+        'Cache-Control': 'private, max-age=86400, immutable',
+      },
+    })
   } catch {
     return NextResponse.json({ error: 'Drive access failed' }, { status: 502 })
   }
