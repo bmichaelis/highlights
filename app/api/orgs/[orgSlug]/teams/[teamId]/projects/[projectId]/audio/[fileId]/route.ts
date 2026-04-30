@@ -51,18 +51,24 @@ export async function GET(req: Request, { params }: Params) {
       return NextResponse.json({ error: 'Drive fetch failed' }, { status: 502 })
     }
 
+    // Buffer the upstream body before returning. Streaming Response.body
+    // through the Worker leaves an in-flight upstream fetch when the browser
+    // cancels mid-stream (which it does on every audio seek), and the
+    // runtime kills the invocation with "code had hung". Buffering caps
+    // the work per request and keeps the response fully self-contained.
+    const buffer = await driveRes.arrayBuffer()
+
     const headers: Record<string, string> = {
       'Content-Type': driveRes.headers.get('content-type') ?? 'audio/mpeg',
       'Cache-Control': 'private, max-age=3600',
+      'Content-Length': String(buffer.byteLength),
     }
     const contentRange = driveRes.headers.get('content-range')
     if (contentRange) headers['Content-Range'] = contentRange
-    const contentLength = driveRes.headers.get('content-length')
-    if (contentLength) headers['Content-Length'] = contentLength
     const acceptRanges = driveRes.headers.get('accept-ranges')
     if (acceptRanges) headers['Accept-Ranges'] = acceptRanges
 
-    return new Response(driveRes.body, { status: driveRes.status, headers })
+    return new Response(buffer, { status: driveRes.status, headers })
   } catch {
     return NextResponse.json({ error: 'Drive access failed' }, { status: 502 })
   }
