@@ -13,6 +13,7 @@ DRIVE_GOOGLE_CLIENT_ID = "540014896460-78no60qlh6c5f9uj5ukmhrh2erh3i5rr.apps.goo
 NEXTAUTH_URL = "https://highlights.kindacoach.com"
 GITHUB_OWNER = "bmichaelis"
 GITHUB_REPO = "highlights"
+AUDIO_PUBLIC_BASE_URL = "https://placeholder.r2.dev"
 
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
