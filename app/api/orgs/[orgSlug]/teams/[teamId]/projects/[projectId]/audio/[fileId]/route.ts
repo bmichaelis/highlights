@@ -53,7 +53,10 @@ export async function GET(_req: Request, { params }: Params) {
     })
 
     return Response.redirect(publicUrl, 302)
-  } catch {
+  } catch (err) {
+    // Token refresh, Drive fetch, or R2 put can throw; surface the cause
+    // in wrangler tail so production triage isn't a guessing game.
+    console.error('[audio] cold-fill failed for', fileId, err)
     return NextResponse.json({ error: 'Drive access failed' }, { status: 502 })
   }
 }
