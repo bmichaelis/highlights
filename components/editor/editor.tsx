@@ -79,8 +79,15 @@ export function Editor({ orgSlug, teamId, projectId, projectName, projectSlug, i
     const p = new Promise<number | null>((resolve) => {
       const a = new Audio()
       a.preload = 'metadata'
-      a.onloadedmetadata = () => resolve(isFinite(a.duration) ? a.duration : null)
-      a.onerror = () => resolve(null)
+      const finish = (dur: number | null) => {
+        // Release the connection so the preview-panel <audio> isn't competing
+        // for the same URL on the HTTP/2 connection.
+        a.removeAttribute('src')
+        a.load()
+        resolve(dur)
+      }
+      a.onloadedmetadata = () => finish(isFinite(a.duration) ? a.duration : null)
+      a.onerror = () => finish(null)
       a.src = `${audioBase}/${mediaId}`
     })
     audioDurationCache.current.set(mediaId, p)

@@ -44,18 +44,19 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
         audio.pause()
         continue
       }
+      const sourceIn = activeAudioClip.sourceIn ?? 0
+      const expected = sourceIn + (playhead - activeAudioClip.start)
       const prevClipId = loadedClipIdRef.current.get(track.id)
       if (prevClipId !== activeAudioClip.id) {
         audio.src = `${audioBaseUrl}/${activeAudioClip.mediaId}`
-        audio.currentTime = playhead - activeAudioClip.start
+        audio.currentTime = expected
         loadedClipIdRef.current.set(track.id, activeAudioClip.id)
       } else if (!playing) {
-        audio.currentTime = playhead - activeAudioClip.start
-      } else {
-        const expected = playhead - activeAudioClip.start
-        if (Math.abs(audio.currentTime - expected) > 0.25) {
-          audio.currentTime = expected
-        }
+        audio.currentTime = expected
+      } else if (audio.readyState >= 2 && Math.abs(audio.currentTime - expected) > 0.25) {
+        // Skip drift correction until metadata is loaded — otherwise a play loop running
+        // faster than the initial fetch triggers seek→Range→cancel storms.
+        audio.currentTime = expected
       }
       if (playing) {
         audio.play().catch((e: Error) => {
