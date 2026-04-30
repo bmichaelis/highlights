@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { requireSession, requireOrgMember } from '@/lib/auth-helpers'
 import { getDb } from '@/db'
 import { organizations, teams, projects, driveConnections } from '@/db/schema'
 import { and, eq } from 'drizzle-orm'
-import { refreshDriveToken } from '@/lib/drive/auth'
-
-const TOKEN_REFRESH_BUFFER_MS = 60_000
+import { getFreshAccessToken } from '@/lib/drive/auth'
 
 type Params = { params: Promise<{ orgSlug: string; teamId: string; projectId: string; fileId: string }> }
 
@@ -23,26 +22,21 @@ export async function GET(_req: Request, { params }: Params) {
   const project = await db.query.projects.findFirst({ where: and(eq(projects.id, projectId), eq(projects.teamId, teamId)) })
   if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const { env } = getCloudflareContext()
+  const publicUrl = `${env.AUDIO_PUBLIC_BASE_URL}/${fileId}`
+
+  // Fast path — file is already in R2.
+  const existing = await env.AUDIO_BUCKET.head(fileId)
+  if (existing) {
+    return Response.redirect(publicUrl, 302)
+  }
+
+  // Cold path — fetch from Drive once, write to R2, then redirect.
   const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
   try {
-    let accessToken = conn.accessToken
-    const expiresAtMs = conn.expiresAt ? conn.expiresAt.getTime() : 0
-    if (!accessToken || expiresAtMs < Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-      const tokenData = await refreshDriveToken(conn.refreshToken)
-      accessToken = tokenData.accessToken
-      await db.update(driveConnections)
-        .set({ accessToken, expiresAt: new Date(tokenData.expiresAt) })
-        .where(eq(driveConnections.id, conn.id))
-    }
-
-    // Always fetch the full file from Drive — do NOT forward Range. The
-    // browser's <audio> element issues many tiny range requests during normal
-    // playback (and many more on every seek), each of which lands on the
-    // Worker and exhausts CPU. By serving the full file once with strong
-    // cache headers and no Accept-Ranges, the browser fetches the file once
-    // and serves all subsequent reads from its own cache.
+    const accessToken = await getFreshAccessToken(conn, db)
     const driveRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -51,16 +45,14 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: 'Drive fetch failed' }, { status: 502 })
     }
 
-    const buffer = await driveRes.arrayBuffer()
-
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': driveRes.headers.get('content-type') ?? 'audio/mpeg',
-        'Content-Length': String(buffer.byteLength),
-        'Cache-Control': 'private, max-age=86400, immutable',
+    await env.AUDIO_BUCKET.put(fileId, driveRes.body, {
+      httpMetadata: {
+        contentType: driveRes.headers.get('content-type') ?? 'audio/mpeg',
+        cacheControl: 'public, max-age=31536000, immutable',
       },
     })
+
+    return Response.redirect(publicUrl, 302)
   } catch {
     return NextResponse.json({ error: 'Drive access failed' }, { status: 502 })
   }
