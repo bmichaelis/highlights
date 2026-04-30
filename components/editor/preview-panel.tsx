@@ -48,21 +48,24 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
       const expected = sourceIn + (playhead - activeAudioClip.start)
       const prevClipId = loadedClipIdRef.current.get(track.id)
       if (prevClipId !== activeAudioClip.id) {
+        // New clip — load source and seek to where the playhead is.
         audio.src = `${audioBaseUrl}/${activeAudioClip.mediaId}`
         audio.currentTime = expected
         loadedClipIdRef.current.set(track.id, activeAudioClip.id)
       } else if (!playing) {
-        audio.currentTime = expected
-      } else if (audio.readyState >= 2 && Math.abs(audio.currentTime - expected) > 0.25) {
-        // Skip drift correction until metadata is loaded — otherwise a play loop running
-        // faster than the initial fetch triggers seek→Range→cancel storms.
+        // Paused — keep audio aligned with the scrubbed playhead.
         audio.currentTime = expected
       }
+      // While playing on the same clip, do NOT touch audio.currentTime.
+      // The audio element is its own clock; setting currentTime each frame
+      // creates seek→Range→cancel storms that exhaust the Worker.
       if (playing) {
-        audio.play().catch((e: Error) => {
-          if (e.name !== 'AbortError') console.warn('Audio play failed', e)
-        })
-      } else {
+        if (audio.paused) {
+          audio.play().catch((e: Error) => {
+            if (e.name !== 'AbortError') console.warn('Audio play failed', e)
+          })
+        }
+      } else if (!audio.paused) {
         audio.pause()
       }
     }
