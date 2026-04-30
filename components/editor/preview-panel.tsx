@@ -31,6 +31,7 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
   const scrubRef = useRef<HTMLDivElement>(null)
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map())
   const loadedClipIdRef = useRef<Map<string, string>>(new Map())
+  const lastPlayAttemptRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     const audioTracks = timeline.tracks.filter((t) => t.kind === 'audio')
@@ -44,24 +45,37 @@ export function PreviewPanel({ timeline, playhead, playing, totalDuration, audio
         audio.pause()
         continue
       }
+      const sourceIn = activeAudioClip.sourceIn ?? 0
+      const expected = sourceIn + (playhead - activeAudioClip.start)
       const prevClipId = loadedClipIdRef.current.get(track.id)
       if (prevClipId !== activeAudioClip.id) {
+        // New clip — load source and seek to where the playhead is.
         audio.src = `${audioBaseUrl}/${activeAudioClip.mediaId}`
-        audio.currentTime = playhead - activeAudioClip.start
+        audio.currentTime = expected
         loadedClipIdRef.current.set(track.id, activeAudioClip.id)
+        lastPlayAttemptRef.current.delete(track.id)
       } else if (!playing) {
-        audio.currentTime = playhead - activeAudioClip.start
-      } else {
-        const expected = playhead - activeAudioClip.start
-        if (Math.abs(audio.currentTime - expected) > 0.25) {
-          audio.currentTime = expected
-        }
+        // Paused — keep audio aligned with the scrubbed playhead.
+        audio.currentTime = expected
       }
+      // While playing on the same clip, do NOT touch audio.currentTime.
+      // The audio element is its own clock; setting currentTime each frame
+      // creates seek→Range→cancel storms that exhaust the Worker.
       if (playing) {
-        audio.play().catch((e: Error) => {
-          if (e.name !== 'AbortError') console.warn('Audio play failed', e)
-        })
-      } else {
+        // Throttle play() retries: a buffer underrun pauses the audio
+        // legitimately; calling play() every frame triggers a request
+        // storm that prevents recovery. Bail out on hard errors entirely.
+        if (audio.paused && !audio.error) {
+          const now = Date.now()
+          const last = lastPlayAttemptRef.current.get(track.id) ?? 0
+          if (now - last > 1000) {
+            lastPlayAttemptRef.current.set(track.id, now)
+            audio.play().catch((e: Error) => {
+              if (e.name !== 'AbortError') console.warn('Audio play failed', e)
+            })
+          }
+        }
+      } else if (!audio.paused) {
         audio.pause()
       }
     }

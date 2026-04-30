@@ -5,9 +5,11 @@ import { organizations, teams, projects, driveConnections } from '@/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { refreshDriveToken } from '@/lib/drive/auth'
 
+const TOKEN_REFRESH_BUFFER_MS = 60_000
+
 type Params = { params: Promise<{ orgSlug: string; teamId: string; projectId: string; fileId: string }> }
 
-export async function GET(req: Request, { params }: Params) {
+export async function GET(_req: Request, { params }: Params) {
   const session = await requireSession()
   const { orgSlug, teamId, projectId, fileId } = await params
   const db = getDb()
@@ -25,36 +27,40 @@ export async function GET(req: Request, { params }: Params) {
   if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
 
   try {
-    const tokenData = await refreshDriveToken(conn.refreshToken)
-    await db.update(driveConnections)
-      .set({ accessToken: tokenData.accessToken, expiresAt: new Date(tokenData.expiresAt) })
-      .where(eq(driveConnections.id, conn.id))
+    let accessToken = conn.accessToken
+    const expiresAtMs = conn.expiresAt ? conn.expiresAt.getTime() : 0
+    if (!accessToken || expiresAtMs < Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+      const tokenData = await refreshDriveToken(conn.refreshToken)
+      accessToken = tokenData.accessToken
+      await db.update(driveConnections)
+        .set({ accessToken, expiresAt: new Date(tokenData.expiresAt) })
+        .where(eq(driveConnections.id, conn.id))
+    }
 
-    const range = req.headers.get('range')
+    // Always fetch the full file from Drive — do NOT forward Range. The
+    // browser's <audio> element issues many tiny range requests during normal
+    // playback (and many more on every seek), each of which lands on the
+    // Worker and exhausts CPU. By serving the full file once with strong
+    // cache headers and no Accept-Ranges, the browser fetches the file once
+    // and serves all subsequent reads from its own cache.
     const driveRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      {
-        headers: {
-          Authorization: `Bearer ${tokenData.accessToken}`,
-          ...(range ? { Range: range } : {}),
-        },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     )
-    if (!driveRes.ok && driveRes.status !== 206) {
+    if (!driveRes.ok) {
       return NextResponse.json({ error: 'Drive fetch failed' }, { status: 502 })
     }
 
-    const headers: Record<string, string> = {
-      'Content-Type': driveRes.headers.get('content-type') ?? 'audio/mpeg',
-    }
-    const contentRange = driveRes.headers.get('content-range')
-    if (contentRange) headers['Content-Range'] = contentRange
-    const contentLength = driveRes.headers.get('content-length')
-    if (contentLength) headers['Content-Length'] = contentLength
-    const acceptRanges = driveRes.headers.get('accept-ranges')
-    if (acceptRanges) headers['Accept-Ranges'] = acceptRanges
+    const buffer = await driveRes.arrayBuffer()
 
-    return new Response(driveRes.body, { status: driveRes.status, headers })
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': driveRes.headers.get('content-type') ?? 'audio/mpeg',
+        'Content-Length': String(buffer.byteLength),
+        'Cache-Control': 'private, max-age=86400, immutable',
+      },
+    })
   } catch {
     return NextResponse.json({ error: 'Drive access failed' }, { status: 502 })
   }

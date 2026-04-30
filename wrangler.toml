@@ -43,3 +43,12 @@ binding = "DB"
 database_name = "highlights-db"
 database_id = "fb97c033-3e94-4479-a532-5458ea93cf1d"
 migrations_dir = "db/migrations"
+
+[observability]
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
