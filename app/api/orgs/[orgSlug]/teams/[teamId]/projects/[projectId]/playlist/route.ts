@@ -5,6 +5,7 @@ import { organizations, teams, playlistItems, players, projects, driveConnection
 import { and, asc, eq } from 'drizzle-orm'
 import { buildPlaylist } from '@/lib/drive/sequencer'
 import { getFreshAccessToken } from '@/lib/drive/auth'
+import { thumbnailRouteUrl } from '@/lib/thumbnail-url'
 
 type Params = { params: Promise<{ orgSlug: string; teamId: string; projectId: string }> }
 
@@ -35,7 +36,10 @@ export async function GET(_req: Request, { params }: Params) {
     .where(eq(playlistItems.projectId, projectId))
     .orderBy(asc(playlistItems.position))
 
-  return NextResponse.json(items)
+  return NextResponse.json(items.map(item => ({
+    ...item,
+    thumbnailUrl: thumbnailRouteUrl(orgSlug, teamId, projectId, item.driveFileId),
+  })))
 }
 
 export async function PATCH(req: Request, { params }: Params) {

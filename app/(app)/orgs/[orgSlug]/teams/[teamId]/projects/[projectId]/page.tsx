@@ -4,6 +4,7 @@ import { getDb } from '@/db'
 import { organizations, teams, projects, playlistItems } from '@/db/schema'
 import { and, asc, eq } from 'drizzle-orm'
 import { Editor } from '@/components/editor/editor'
+import { thumbnailRouteUrl } from '@/lib/thumbnail-url'
 
 type Props = { params: Promise<{ orgSlug: string; teamId: string; projectId: string }> }
 
@@ -21,16 +22,20 @@ export default async function ProjectPage({ params }: Props) {
   const project = await db.query.projects.findFirst({ where: and(eq(projects.id, projectId), eq(projects.teamId, teamId)) })
   if (!project) notFound()
 
-  const items = await db
+  const rawItems = await db
     .select({
       driveFileId: playlistItems.driveFileId,
       duration: playlistItems.durationOverride,
       position: playlistItems.position,
-      thumbnailUrl: playlistItems.thumbnailUrl,
     })
     .from(playlistItems)
     .where(eq(playlistItems.projectId, projectId))
     .orderBy(asc(playlistItems.position))
+
+  const items = rawItems.map(r => ({
+    ...r,
+    thumbnailUrl: thumbnailRouteUrl(orgSlug, teamId, projectId, r.driveFileId),
+  }))
 
   const initialTimeline = project.timelineJson ? JSON.parse(project.timelineJson) : null
   const projectSlug = project.name.toLowerCase().replace(/\s+/g, '_')

@@ -2,6 +2,8 @@ interface CloudflareEnv {
   DB: D1Database
   AUDIO_BUCKET: R2Bucket
   AUDIO_PUBLIC_BASE_URL: string
+  THUMBNAIL_BUCKET: R2Bucket
+  THUMBNAIL_PUBLIC_BASE_URL: string
   AUTH_SECRET: string
   AUTH_GOOGLE_ID: string
   AUTH_GOOGLE_SECRET: string

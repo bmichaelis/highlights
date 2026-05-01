@@ -14,6 +14,7 @@ NEXTAUTH_URL = "https://highlights.kindacoach.com"
 GITHUB_OWNER = "bmichaelis"
 GITHUB_REPO = "highlights"
 AUDIO_PUBLIC_BASE_URL = "https://pub-1035b3a927c644bc813be144ce9e3ec0.r2.dev"
+THUMBNAIL_PUBLIC_BASE_URL = "https://pub-429ae70fec024a829dcd2f2212bbb92e.r2.dev"
 
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
@@ -38,6 +39,10 @@ new_sqlite_classes = ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"]
 [[r2_buckets]]
 binding = "AUDIO_BUCKET"
 bucket_name = "highlights-audio"
+
+[[r2_buckets]]
+binding = "THUMBNAIL_BUCKET"
+bucket_name = "highlights-thumbnails"
 
 [[d1_databases]]
 binding = "DB"
