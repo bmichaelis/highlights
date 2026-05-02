@@ -94,6 +94,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (!project.folderId) return NextResponse.json({ error: 'No folder set for this project' }, { status: 400 })
     const conn = await db.query.driveConnections.findFirst({ where: eq(driveConnections.teamId, teamId) })
     if (!conn) return NextResponse.json({ error: 'Drive not connected' }, { status: 400 })
+    // buildPlaylist now requires { name } on each player; full-row query above provides it.
     const projectPlayers = await db.query.players.findMany({ where: eq(players.projectId, projectId) })
     const accessToken = await getFreshAccessToken(conn, db)
     const playlist = await buildPlaylist(projectPlayers, project.folderId, accessToken, project.imagesPerPlayer)
