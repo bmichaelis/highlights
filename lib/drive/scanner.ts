@@ -34,3 +34,16 @@ export async function scanTeamFolder(folderId: string, accessToken: string) {
     audioFiles: pickAudioFiles(files),
   }
 }
+
+// Multiple folders can match `misc` (e.g., `misc/` and `Misc/`); the
+// last-encountered match wins. Drive's enumeration order is not specified,
+// so this is a simple "use whichever Drive listed last" rule.
+export function partitionTopLevel(folders: { id: string; name: string }[]) {
+  const players: typeof folders = []
+  let misc: typeof folders[number] | null = null
+  for (const f of folders) {
+    if (f.name.toLowerCase() === 'misc') misc = f
+    else players.push(f)
+  }
+  return { players, misc }
+}
