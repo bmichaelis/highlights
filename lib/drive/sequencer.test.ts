@@ -4,6 +4,7 @@ import {
   mergeChronological,
   collectImagesUnder,
   resolveSubfolderId,
+  interleaveRandom,
 } from './sequencer'
 
 describe('pickEvenly', () => {
@@ -132,5 +133,86 @@ describe('resolveSubfolderId', () => {
     }))
 
     await expect(resolveSubfolderId('parent', 'Lucas', 'tok')).rejects.toThrow(/Drive folder lookup failed/)
+  })
+})
+
+describe('interleaveRandom', () => {
+  type Img = { playerId: string; idx: number }
+  const img = (playerId: string, idx: number): Img => ({ playerId, idx })
+
+  function buildScenario(perPlayer: number[], miscIndex: number | null = null) {
+    const lists: Img[][] = []
+    const players: { id: string; isMisc: boolean }[] = []
+    for (let p = 0; p < perPlayer.length; p++) {
+      const id = `p${p}`
+      const isMisc = p === miscIndex
+      lists.push(Array.from({ length: perPlayer[p] }, (_, i) => img(id, i)))
+      players.push({ id, isMisc })
+    }
+    return { lists, players }
+  }
+
+  function totalCount(lists: unknown[][]) {
+    return lists.reduce((n, l) => n + l.length, 0)
+  }
+
+  it('preserves length over 100 random runs', () => {
+    const { lists, players } = buildScenario([3, 4, 5])
+    const expected = totalCount(lists)
+    for (let i = 0; i < 100; i++) {
+      expect(interleaveRandom(lists.map((l) => [...l]), players)).toHaveLength(expected)
+    }
+  })
+
+  it('preserves the multiset of items', () => {
+    const { lists, players } = buildScenario([3, 4, 5])
+    const flat = lists.flat()
+    for (let i = 0; i < 100; i++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      expect(out).toHaveLength(flat.length)
+      const inKeys = flat.map((x) => `${x.playerId}:${x.idx}`).sort()
+      const outKeys = out.map((x) => `${x.playerId}:${x.idx}`).sort()
+      expect(outKeys).toEqual(inKeys)
+    }
+  })
+
+  it('never places two regular players adjacent (when avoidable)', () => {
+    const { lists, players } = buildScenario([4, 4, 4])
+    for (let trial = 0; trial < 100; trial++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      for (let i = 1; i < out.length; i++) {
+        const prev = out[i - 1]
+        const curr = out[i]
+        const prevIsMisc = players.find((p) => p.id === prev.playerId)?.isMisc ?? false
+        const currIsMisc = players.find((p) => p.id === curr.playerId)?.isMisc ?? false
+        if (!prevIsMisc && !currIsMisc) {
+          expect(prev.playerId).not.toBe(curr.playerId)
+        }
+      }
+    }
+  })
+
+  it('allows misc-misc adjacency when misc dominates', () => {
+    const { lists, players } = buildScenario([4, 20], /* miscIndex */ 1)
+    for (let trial = 0; trial < 50; trial++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      expect(out).toHaveLength(24)
+    }
+  })
+
+  it('accepts forced regular-player repeats when only one player has photos left', () => {
+    const { lists, players } = buildScenario([1, 5])
+    for (let trial = 0; trial < 50; trial++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      expect(out).toHaveLength(6)
+    }
+  })
+
+  it('is deterministic when a fixed RNG is injected', () => {
+    const { lists, players } = buildScenario([2, 2])
+    const fixed = () => 0
+    const a = interleaveRandom(lists.map((l) => [...l]), players, fixed)
+    const b = interleaveRandom(lists.map((l) => [...l]), players, fixed)
+    expect(a).toEqual(b)
   })
 })

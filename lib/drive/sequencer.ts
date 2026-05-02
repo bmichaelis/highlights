@@ -160,3 +160,53 @@ export async function buildPlaylist(
   const selected = allPlayerImages.map((imgs) => pickEvenly(imgs, imagesPerPlayer))
   return mergeInterspersed(selected)
 }
+
+type SeqPlayer = { id: string; isMisc: boolean }
+
+function shuffle<T>(arr: T[], random: () => number): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+export function interleaveRandom<T>(
+  perPlayerLists: T[][],
+  players: SeqPlayer[],
+  random: () => number = Math.random,
+): T[] {
+  const queues = perPlayerLists.map((list) => shuffle([...list], random))
+  const result: T[] = []
+  let lastPlayerId: string | null = null
+  let lastWasMisc = false
+
+  while (queues.some((q) => q.length > 0)) {
+    const eligible: number[] = []
+    for (let i = 0; i < queues.length; i++) {
+      if (queues[i].length === 0) continue
+      // Same-regular-player adjacency conflict — skip unless either side is misc.
+      const conflict = !lastWasMisc && !players[i].isMisc && players[i].id === lastPlayerId
+      if (!conflict) eligible.push(i)
+    }
+    const pool = eligible.length > 0
+      ? eligible
+      : queues.map((_, i) => i).filter((i) => queues[i].length > 0)
+
+    // Pick from queues tied for largest remaining size, breaking ties at
+    // random. Largest-first prevents skewed depletion (a smaller queue
+    // emptying first while a larger one still has many items, forcing
+    // adjacent same-player items at the tail). Random tiebreak keeps the
+    // ordering varied between runs.
+    let maxSize = 0
+    for (const i of pool) {
+      if (queues[i].length > maxSize) maxSize = queues[i].length
+    }
+    const largest = pool.filter((i) => queues[i].length === maxSize)
+    const chosen = largest[Math.floor(random() * largest.length)]
+    result.push(queues[chosen].shift()!)
+    lastPlayerId = players[chosen].id
+    lastWasMisc = players[chosen].isMisc
+  }
+  return result
+}
