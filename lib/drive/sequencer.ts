@@ -84,6 +84,70 @@ export async function fetchPlayerImages(
   }))
 }
 
+type DriveListEntry = {
+  id: string
+  name: string
+  mimeType: string
+  thumbnailLink?: string
+  imageMediaMetadata?: { time?: string }
+  modifiedTime?: string
+}
+
+export async function collectImagesUnder(
+  rootFolderId: string,
+  accessToken: string,
+): Promise<DriveImageFile[]> {
+  const all: DriveImageFile[] = []
+  const queue: string[] = [rootFolderId]
+  const seenFolders = new Set<string>()
+
+  while (queue.length > 0) {
+    const folderId = queue.shift()!
+    if (seenFolders.has(folderId)) continue
+    seenFolders.add(folderId)
+
+    const fields = 'files(id,name,mimeType,thumbnailLink,imageMediaMetadata(time),modifiedTime)'
+    const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`)
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=1000`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )
+    if (!res.ok) throw new Error(`Drive list failed: ${await res.text()}`)
+    const { files } = await res.json() as { files?: DriveListEntry[] }
+    for (const f of files ?? []) {
+      if (f.mimeType === 'application/vnd.google-apps.folder') {
+        queue.push(f.id)
+      } else if (f.mimeType.startsWith('image/')) {
+        all.push({
+          id: f.id,
+          name: f.name,
+          thumbnailLink: f.thumbnailLink,
+          imageMediaMetadata: f.imageMediaMetadata,
+          modifiedTime: f.modifiedTime ?? new Date(0).toISOString(),
+        })
+      }
+    }
+  }
+  return all
+}
+
+export async function resolveSubfolderId(
+  parentFolderId: string,
+  folderName: string,
+  accessToken: string,
+): Promise<string | null> {
+  const q = encodeURIComponent(
+    `'${parentFolderId}' in parents and name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  )
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+  if (!res.ok) throw new Error(`Drive folder lookup failed: ${await res.text()}`)
+  const { files } = await res.json() as { files?: { id: string }[] }
+  return files?.[0]?.id ?? null
+}
+
 export async function buildPlaylist(
   players: { id: string; folderName: string }[],
   parentFolderId: string,
