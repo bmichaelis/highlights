@@ -46,7 +46,8 @@ export async function GET(_req: Request, { params }: Params) {
     const { thumbnailLink } = await metaRes.json() as { thumbnailLink?: string }
     if (!thumbnailLink) return NextResponse.json({ error: 'No thumbnail available' }, { status: 404 })
 
-    const imgRes = await fetch(thumbnailLink)
+    const upscaled = thumbnailLink.replace(/=s\d+/, '=s1280')
+    const imgRes = await fetch(upscaled)
     if (!imgRes.ok || !imgRes.body) {
       return NextResponse.json({ error: 'Thumbnail fetch failed' }, { status: 502 })
     }
