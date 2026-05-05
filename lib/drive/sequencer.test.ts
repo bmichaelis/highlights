@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { pickEvenly, mergeChronological } from './sequencer'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import {
+  pickEvenly,
+  mergeChronological,
+  collectImagesUnder,
+  resolveSubfolderId,
+  interleaveRandom,
+} from './sequencer'
 
 describe('pickEvenly', () => {
   it('returns all items when count >= available', () => {
@@ -34,5 +40,179 @@ describe('mergeChronological', () => {
 
   it('handles players with no images', () => {
     expect(mergeChronological([[], [{ playerId: 'a', date: 1 }]])).toHaveLength(1)
+  })
+})
+
+describe('collectImagesUnder', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function makeListResponse(files: unknown[]) {
+    return { ok: true, json: () => Promise.resolve({ files }) }
+  }
+
+  function img(id: string) {
+    return { id, name: `${id}.jpg`, mimeType: 'image/jpeg', modifiedTime: '2026-01-01T00:00:00Z' }
+  }
+
+  function folder(id: string, name: string) {
+    return { id, name, mimeType: 'application/vnd.google-apps.folder' }
+  }
+
+  it('returns images from a single folder', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(makeListResponse([img('a'), img('b')]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await collectImagesUnder('root', 'tok')
+    expect(result.map((f) => f.id)).toEqual(['a', 'b'])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('recurses into subfolders', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(makeListResponse([folder('sub', 'spring'), img('a')]))
+      .mockResolvedValueOnce(makeListResponse([img('b'), img('c')]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await collectImagesUnder('root', 'tok')
+    expect(result.map((f) => f.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('terminates on cycles via seenFolders', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(makeListResponse([folder('sub', 'a'), img('a')]))
+      .mockResolvedValueOnce(makeListResponse([folder('root', 'root'), img('b')]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await collectImagesUnder('root', 'tok')
+    expect(result.map((f) => f.id).sort()).toEqual(['a', 'b'])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns empty for an empty folder', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(makeListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await collectImagesUnder('root', 'tok')).toEqual([])
+  })
+
+  it('throws on Drive API error', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: false, text: () => Promise.resolve('boom') })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(collectImagesUnder('root', 'tok')).rejects.toThrow(/Drive list failed/)
+  })
+})
+
+describe('resolveSubfolderId', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('returns the subfolder id when found', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ files: [{ id: 'sub1' }] }),
+    }))
+
+    expect(await resolveSubfolderId('parent', 'Lucas', 'tok')).toBe('sub1')
+  })
+
+  it('returns null when no folder matches', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ files: [] }),
+    }))
+
+    expect(await resolveSubfolderId('parent', 'Lucas', 'tok')).toBeNull()
+  })
+
+  it('throws on Drive API error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
+      ok: false,
+      text: () => Promise.resolve('forbidden'),
+    }))
+
+    await expect(resolveSubfolderId('parent', 'Lucas', 'tok')).rejects.toThrow(/Drive folder lookup failed/)
+  })
+})
+
+describe('interleaveRandom', () => {
+  type Img = { playerId: string; idx: number }
+  const img = (playerId: string, idx: number): Img => ({ playerId, idx })
+
+  function buildScenario(perPlayer: number[], miscIndex: number | null = null) {
+    const lists: Img[][] = []
+    const players: { id: string; isMisc: boolean }[] = []
+    for (let p = 0; p < perPlayer.length; p++) {
+      const id = `p${p}`
+      const isMisc = p === miscIndex
+      lists.push(Array.from({ length: perPlayer[p] }, (_, i) => img(id, i)))
+      players.push({ id, isMisc })
+    }
+    return { lists, players }
+  }
+
+  function totalCount(lists: unknown[][]) {
+    return lists.reduce((n, l) => n + l.length, 0)
+  }
+
+  it('preserves length over 100 random runs', () => {
+    const { lists, players } = buildScenario([3, 4, 5])
+    const expected = totalCount(lists)
+    for (let i = 0; i < 100; i++) {
+      expect(interleaveRandom(lists.map((l) => [...l]), players)).toHaveLength(expected)
+    }
+  })
+
+  it('preserves the multiset of items', () => {
+    const { lists, players } = buildScenario([3, 4, 5])
+    const flat = lists.flat()
+    for (let i = 0; i < 100; i++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      expect(out).toHaveLength(flat.length)
+      const inKeys = flat.map((x) => `${x.playerId}:${x.idx}`).sort()
+      const outKeys = out.map((x) => `${x.playerId}:${x.idx}`).sort()
+      expect(outKeys).toEqual(inKeys)
+    }
+  })
+
+  it('never places two regular players adjacent (when avoidable)', () => {
+    const { lists, players } = buildScenario([4, 4, 4])
+    for (let trial = 0; trial < 100; trial++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      for (let i = 1; i < out.length; i++) {
+        const prev = out[i - 1]
+        const curr = out[i]
+        const prevIsMisc = players.find((p) => p.id === prev.playerId)?.isMisc ?? false
+        const currIsMisc = players.find((p) => p.id === curr.playerId)?.isMisc ?? false
+        if (!prevIsMisc && !currIsMisc) {
+          expect(prev.playerId).not.toBe(curr.playerId)
+        }
+      }
+    }
+  })
+
+  it('allows misc-misc adjacency when misc dominates', () => {
+    const { lists, players } = buildScenario([4, 20], /* miscIndex */ 1)
+    for (let trial = 0; trial < 50; trial++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      expect(out).toHaveLength(24)
+    }
+  })
+
+  it('accepts forced regular-player repeats when only one player has photos left', () => {
+    const { lists, players } = buildScenario([1, 5])
+    for (let trial = 0; trial < 50; trial++) {
+      const out = interleaveRandom(lists.map((l) => [...l]), players)
+      expect(out).toHaveLength(6)
+    }
+  })
+
+  it('is deterministic when a fixed RNG is injected', () => {
+    const { lists, players } = buildScenario([2, 2])
+    const fixed = () => 0
+    const a = interleaveRandom(lists.map((l) => [...l]), players, fixed)
+    const b = interleaveRandom(lists.map((l) => [...l]), players, fixed)
+    expect(a).toEqual(b)
   })
 })

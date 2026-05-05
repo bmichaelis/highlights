@@ -5,7 +5,7 @@ import { organizations, teams, projects, players, playlistItems, driveConnection
 import { and, eq } from 'drizzle-orm'
 import { buildPlaylist } from '@/lib/drive/sequencer'
 import { getFreshAccessToken } from '@/lib/drive/auth'
-import { listFolderContents, parseDriveFiles } from '@/lib/drive/scanner'
+import { listFolderContents, parseDriveFiles, partitionTopLevel } from '@/lib/drive/scanner'
 
 type Params = { params: Promise<{ orgSlug: string; teamId: string }> }
 
@@ -60,13 +60,19 @@ export async function POST(req: Request, { params }: Params) {
   try {
     const accessToken = await getFreshAccessToken(conn, db)
     const files = await listFolderContents(folderId.trim(), accessToken)
-    const folderItems = parseDriveFiles(files)
+    const allFolders = parseDriveFiles(files)
+    const { players: playerFolders, misc: miscFolder } = partitionTopLevel(allFolders)
+    const folderItems = miscFolder ? [...playerFolders, miscFolder] : playerFolders
     if (folderItems.length > 0) {
       // D1 limit: 100 bound params per statement. players=4/row → chunk 20; playlistItems=7/row → chunk 10
       const newPlayers: { id: string; projectId: string; name: string; folderName: string }[] = []
       for (let i = 0; i < folderItems.length; i += 20) {
         const chunk = await db.insert(players).values(
-          folderItems.slice(i, i + 20).map((f) => ({ projectId: project.id, name: f.name, folderName: f.name }))
+          folderItems.slice(i, i + 20).map((f) => ({
+            projectId: project.id,
+            name: f === miscFolder ? 'misc' : f.name,
+            folderName: f.name,
+          }))
         ).returning()
         newPlayers.push(...chunk)
       }
