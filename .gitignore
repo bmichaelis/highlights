@@ -52,3 +52,6 @@ test-project/
 # Superpowers brainstorm artifacts
 .superpowers/
 .worktrees/
+
+# Design-handoff archive (content captured in docs/superpowers/)
+Highlights.zip
